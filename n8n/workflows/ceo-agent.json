@@ -1,0 +1,306 @@
+{
+  "name": "Cipher Studio — CEO Daily Briefing",
+  "nodes": [
+    {
+      "id": "ceo-trigger",
+      "name": "Daily 7am Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 340],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ceo-fetch-opps",
+      "name": "Fetch Pending Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 180],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "eq.pending" },
+            { "name": "order", "value": "score.desc" },
+            { "name": "limit", "value": "5" },
+            { "name": "select", "value": "title,niche,score,rationale,created_at" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ceo-fetch-products",
+      "name": "Fetch Active Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 340],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/products",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "order", "value": "created_at.desc" },
+            { "name": "limit", "value": "10" },
+            { "name": "select", "value": "name,type,status,created_at" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ceo-fetch-reports",
+      "name": "Fetch Last Weekly Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 500],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/weekly_reports",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "order", "value": "created_at.desc" },
+            { "name": "limit", "value": "1" },
+            { "name": "select", "value": "week_start,total_revenue,total_orders,net_revenue,summary" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ceo-merge",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [680, 340],
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      }
+    },
+    {
+      "id": "ceo-aggregate",
+      "name": "Aggregate Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 340],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Collect outputs from each Supabase node regardless of whether\n// their responses were returned as a single array item or split into multiple items.\nfunction collect(nodeName) {\n  const items = $('` + nodeName + `').all().map(i => i.json);\n  // If the first item is itself an array (Supabase returned array as single HTTP item), flatten\n  if (items.length === 1 && Array.isArray(items[0])) return items[0];\n  return items;\n}\n\nconst opportunities = collect('Fetch Pending Opportunities');\nconst products = collect('Fetch Active Products');\nconst reportsRaw = collect('Fetch Last Weekly Report');\nconst lastReport = Array.isArray(reportsRaw) ? (reportsRaw[0] || null) : reportsRaw;\n\nreturn [{\n  json: {\n    opportunities,\n    products,\n    last_report: lastReport,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "ceo-claude",
+      "name": "Claude Sonnet — Write Briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 340],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 2048,\n  system: 'You are the strategic intelligence system for Cipher Studio, an autonomous digital products business selling spreadsheet templates, Notion templates, and business documents to freelancers and small business owners. The CEO reviews this briefing in 5 minutes each morning.\\n\\nWrite a concise, actionable briefing. Be direct. Cut everything that does not drive a decision.\\n\\nReturn ONLY valid JSON — no markdown fences, no prose outside the object:\\n{\\n  \"subject\": \"Cipher Studio — [Weekday] Briefing | [Mon DD]\",\\n  \"top_3_opportunities\": [{\"rank\": 1, \"title\": \"...\", \"niche\": \"...\", \"score\": 0.0, \"why\": \"one sentence on why this wins\"}],\\n  \"products_in_progress\": [{\"name\": \"...\", \"status\": \"...\", \"note\": \"...\"}],\\n  \"alerts\": [\"...\"],\\n  \"recommended_action\": \"Single most important action for today — specific and executable.\",\\n  \"html_body\": \"...complete HTML email body (inline styles, clean layout, brand color #6366f1)...\",\\n  \"summary\": \"2-3 sentence plain-text summary saved to the database.\",\\n  \"week_start\": \"YYYY-MM-DD\",\\n  \"week_end\": \"YYYY-MM-DD\"\\n}',\n  messages: [{\n    role: 'user',\n    content: 'Today is ' + new Date().toLocaleDateString('en-US', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'}) + '.\\n\\nPENDING OPPORTUNITIES (awaiting approval):\\n' + JSON.stringify($json.opportunities, null, 2) + '\\n\\nPRODUCTS IN SYSTEM:\\n' + JSON.stringify($json.products, null, 2) + '\\n\\nLAST WEEKLY REPORT:\\n' + JSON.stringify($json.last_report, null, 2) + '\\n\\nWrite the briefing JSON now.'\n  }]\n}) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "ceo-parse",
+      "name": "Parse Briefing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 340],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = $json.content?.[0]?.text?.trim() || '';\n// Strip markdown code fences if Claude wrapped the JSON\nconst clean = raw.startsWith('```') \n  ? raw.replace(/^```[a-z]*\\n?/, '').replace(/\\n?```$/, '').trim() \n  : raw;\n\nlet parsed;\ntry {\n  parsed = JSON.parse(clean);\n} catch (e) {\n  // Fallback: return a minimal valid object so downstream nodes don't break\n  const today = new Date();\n  parsed = {\n    subject: 'Cipher Studio Briefing — ' + today.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'}),\n    html_body: '<p>Briefing parse error. Raw output:</p><pre>' + raw.replace(/</g, '&lt;') + '</pre>',\n    summary: 'Briefing generation encountered a parse error. Check n8n execution logs.',\n    top_3_opportunities: [],\n    products_in_progress: [],\n    alerts: ['JSON parse error on Claude response — review execution log'],\n    recommended_action: 'Check n8n execution log for Claude output.',\n    week_start: new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],\n    week_end: today.toISOString().split('T')[0]\n  };\n}\n\nreturn [{ json: parsed }];"
+      }
+    },
+    {
+      "id": "ceo-supabase-save",
+      "name": "Supabase — Save Briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/weekly_reports",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ week_start: $json.week_start, week_end: $json.week_end, summary: $json.summary }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "ceo-gmail",
+      "name": "Gmail — Send Briefing",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1560, 460],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-oauth2",
+          "name": "Gmail OAuth2 — Cipher Studio"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html_body }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Daily 7am Trigger": {
+      "main": [
+        [
+          { "node": "Fetch Pending Opportunities", "type": "main", "index": 0 },
+          { "node": "Fetch Active Products", "type": "main", "index": 0 },
+          { "node": "Fetch Last Weekly Report", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Pending Opportunities": {
+      "main": [
+        [{ "node": "Merge", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Active Products": {
+      "main": [
+        [{ "node": "Merge", "type": "main", "index": 1 }]
+      ]
+    },
+    "Fetch Last Weekly Report": {
+      "main": [
+        [{ "node": "Merge", "type": "main", "index": 2 }]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [{ "node": "Aggregate Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Aggregate Data": {
+      "main": [
+        [{ "node": "Claude Sonnet — Write Briefing", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude Sonnet — Write Briefing": {
+      "main": [
+        [{ "node": "Parse Briefing", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Briefing": {
+      "main": [
+        [
+          { "node": "Supabase — Save Briefing", "type": "main", "index": 0 },
+          { "node": "Gmail — Send Briefing", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "1",
+  "id": "cipher-ceo-agent-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [{ "name": "cipher-studio" }]
+}

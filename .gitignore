@@ -1,0 +1,13 @@
+.env
+.env.local
+*.env
+
+# n8n credentials (never commit)
+n8n/credentials/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if any scripts)
+node_modules/

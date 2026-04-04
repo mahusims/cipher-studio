@@ -1,0 +1,163 @@
+{
+  "name": "Cipher Studio — Research Agent",
+  "nodes": [
+    {
+      "id": "node-trigger",
+      "name": "Daily 6am Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-etsy",
+      "name": "Etsy Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "https://openapi.etsy.com/v3/application/listings/active",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ETSY_API_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "keywords",
+              "value": "spreadsheet template notion template business document freelance"
+            },
+            {
+              "name": "limit",
+              "value": "25"
+            },
+            {
+              "name": "sort_on",
+              "value": "score"
+            },
+            {
+              "name": "sort_order",
+              "value": "desc"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-claude",
+      "name": "Claude Haiku — Score Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5-20251001',\n  max_tokens: 1024,\n  system: 'You score Etsy digital product listings as opportunities for a business selling spreadsheet templates, Notion templates, and business documents to freelancers and small business owners.\\n\\nFor each listing, score 1-10 on:\\n- demand: market demand signals (reviews, volume)\\n- competition: inverse score (10 = low competition)\\n- margin: profit potential based on price and bundle potential\\n- ai_producibility: how easily AI can create this product\\n\\nReturn ONLY a valid JSON array. No markdown, no prose. Only include items where (demand + competition + margin + ai_producibility) >= 30.\\n\\nFormat:\\n[{\"title\": \"...\", \"niche\": \"spreadsheet_templates|notion_templates|business_documents|printable_planners|educational_printables\", \"etsy_search\": \"...\", \"keywords\": [\"...\"], \"score\": 0.0, \"rationale\": \"...\", \"score_demand\": 0, \"score_competition\": 0, \"score_margin\": 0, \"score_ai_producibility\": 0}]\\n\\nThe score field = (demand + competition + margin + ai_producibility) / 4, rounded to 2 decimal places.',\n  messages: [{\n    role: 'user',\n    content: 'Score these Etsy listings and return qualifying opportunities as a JSON array:\\n\\n' + JSON.stringify(\n      ($json.results || []).slice(0, 25).map(function(l) {\n        return {\n          title: l.title,\n          price_usd: l.price ? (l.price.amount / (l.price.divisor || 100)) : 0,\n          num_reviews: l.num_reviews || 0,\n          tags: (l.tags || []).slice(0, 8)\n        };\n      })\n    )\n  }]\n}) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-supabase",
+      "name": "Supabase — Save Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ (() => { const text = $json.content[0].text.trim(); const clean = text.startsWith('```') ? text.replace(/^```[a-z]*\\n?/,'').replace(/```$/,'').trim() : text; return clean; })() }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Daily 6am Trigger": {
+      "main": [
+        [{ "node": "Etsy Search", "type": "main", "index": 0 }]
+      ]
+    },
+    "Etsy Search": {
+      "main": [
+        [{ "node": "Claude Haiku — Score Opportunities", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude Haiku — Score Opportunities": {
+      "main": [
+        [{ "node": "Supabase — Save Opportunities", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "1",
+  "id": "cipher-research-agent-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [{ "name": "cipher-studio" }]
+}

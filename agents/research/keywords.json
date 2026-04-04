@@ -1,0 +1,39 @@
+{
+  "clusters": {
+    "freelance_finance": [
+      "freelance invoice tracker",
+      "freelance budget spreadsheet",
+      "freelancer rate calculator",
+      "freelance income tracker google sheets",
+      "self employed tax tracker"
+    ],
+    "client_management": [
+      "client onboarding template notion",
+      "client portal notion template",
+      "freelance contract template",
+      "client questionnaire template",
+      "client project tracker"
+    ],
+    "business_operations": [
+      "small business budget spreadsheet",
+      "business expense tracker google sheets",
+      "business starter kit bundle",
+      "small business bookkeeping template",
+      "profit loss spreadsheet small business"
+    ],
+    "marketing_planning": [
+      "social media content calendar notion",
+      "content calendar spreadsheet",
+      "instagram content planner",
+      "marketing plan template",
+      "email newsletter planner"
+    ],
+    "proposals_documents": [
+      "project proposal template",
+      "business proposal template",
+      "client proposal template",
+      "scope of work template",
+      "freelance quote template"
+    ]
+  }
+}
