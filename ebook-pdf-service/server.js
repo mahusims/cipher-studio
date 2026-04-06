@@ -4,7 +4,7 @@ const puppeteer = require('puppeteer');
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
-const PORT = process.env.PDF_SERVICE_PORT || 3456;
+const PORT = process.env.PORT || process.env.PDF_SERVICE_PORT || 3456;
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -52,6 +52,6 @@ app.post('/convert', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Cipher Studio PDF Service listening on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Cipher Studio PDF Service listening on 0.0.0.0:${PORT}`);
 });
