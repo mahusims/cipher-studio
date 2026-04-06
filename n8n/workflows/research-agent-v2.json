@@ -1,0 +1,365 @@
+{
+  "name": "Cipher Studio — Research Agent v2 (Templates + Ebooks)",
+  "nodes": [
+    {
+      "id": "node-trigger",
+      "name": "Daily 6am Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        460
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-etsy",
+      "name": "Etsy Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://openapi.etsy.com/v3/application/listings/active",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ETSY_API_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "keywords",
+              "value": "spreadsheet template notion template business document freelance"
+            },
+            {
+              "name": "limit",
+              "value": "25"
+            },
+            {
+              "name": "sort_on",
+              "value": "score"
+            },
+            {
+              "name": "sort_order",
+              "value": "desc"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-etsy-ebook",
+      "name": "Etsy Ebook Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        500
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://openapi.etsy.com/v3/application/listings/active",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ETSY_API_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "keywords",
+              "value": "ebook guide AI automation small business freelancer how to"
+            },
+            {
+              "name": "limit",
+              "value": "25"
+            },
+            {
+              "name": "sort_on",
+              "value": "score"
+            },
+            {
+              "name": "sort_order",
+              "value": "desc"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-kdp",
+      "name": "Amazon KDP Research",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        660
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "web-search-2025-03-05"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1024, tools: [{ type: 'web_search_20250305', name: 'web_search' }], system: 'You are a market researcher for Cipher Studio. Search for trending ebook topics on Amazon KDP in these niches: AI tools for small business, freelancer productivity, Etsy seller guides, automation and no-code tools. For each topic found, return the title pattern, estimated competition level (low/medium/high), and price range you observed. Return ONLY valid JSON array.', messages: [{ role: 'user', content: 'Search Amazon KDP now for trending ebook topics in the specified niches. Return your findings as a JSON array where each element has: title_pattern, competition_level, price_range.' }] }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-merge",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        680,
+        500
+      ],
+      "parameters": {
+        "mode": "append",
+        "options": {},
+        "numberInputs": 3
+      }
+    },
+    {
+      "id": "node-normalize",
+      "name": "Normalize & Build Scoring Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        500
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Detect whether this item came from an Etsy search or the KDP Claude research node.\n// Etsy API responses have a 'results' array.\n// KDP node (Claude API) responses have a 'content' array.\nvar isEtsy = $json.results !== undefined;\nvar isKdp  = !isEtsy && $json.content && Array.isArray($json.content);\n\nvar items = [];\n\nif (isEtsy) {\n  items = ($json.results || []).slice(0, 25).map(function(l) {\n    return {\n      source: 'etsy',\n      title: l.title,\n      price_usd: l.price ? (l.price.amount / (l.price.divisor || 100)) : 0,\n      num_reviews: l.num_reviews || 0,\n      tags: (l.tags || []).slice(0, 8)\n    };\n  });\n\n} else if (isKdp) {\n  var rawText = ($json.content[0] || {}).text || '';\n  // Strip web-search tool_use blocks — Claude may return multiple content blocks;\n  // find the text block that contains the JSON array.\n  if ($json.content.length > 1) {\n    for (var i = 0; i < $json.content.length; i++) {\n      if ($json.content[i].type === 'text') {\n        rawText = $json.content[i].text || '';\n        break;\n      }\n    }\n  }\n  var cleanText = rawText.trim().startsWith('```')\n    ? rawText.trim().replace(/^```[a-z]*\\n?/, '').replace(/\\n?```$/, '').trim()\n    : rawText.trim();\n  try {\n    var kdpData = JSON.parse(cleanText);\n    if (Array.isArray(kdpData)) {\n      items = kdpData.map(function(item) {\n        return {\n          source: 'kdp',\n          title: item.title_pattern || item.title || 'Unknown KDP Topic',\n          competition: item.competition_level || 'unknown',\n          price_range: item.price_range || '',\n          niche_hint: 'ebook_guide'\n        };\n      });\n    }\n  } catch(e) {\n    // KDP node returned unparseable content — skip this item\n    return [];\n  }\n}\n\nif (items.length === 0) {\n  return [];\n}\n\n// Build the Claude Haiku scoring request body using array.join to avoid\n// any double-quote characters in the JS source (prevents JSON escaping bugs).\nvar systemLines = [\n  'You score digital product opportunities for Cipher Studio.',\n  'Products sold: spreadsheet templates, Notion templates, business documents, printable planners, educational printables, and ebooks for freelancers and small business owners.',\n  '',\n  'Score each item 1-10 on four dimensions:',\n  '- demand: market demand signals (reviews, search volume, KDP competition signals)',\n  '- competition: inverse score (10 = low competition, 1 = highly saturated)',\n  '- margin: profit potential based on price point and bundle potential',\n  '- ai_producibility: how easily AI can create high-quality output for this product',\n  '',\n  'EBOOK SCORING GUIDANCE:',\n  '- Prioritise specificity of topic (niche beats broad)',\n  '- Favour cross-sell potential alongside existing Cipher Studio templates',\n  '- Prioritise topics where AI can produce high-quality long-form content',\n  '- Single ebooks: target $9.99-19.99 price range',\n  '- Ebook + template bundles: target $29-49 price range',\n  '- Low-competition KDP niches with specific actionable how-to angles score highest',\n  '',\n  'Return ONLY a valid JSON array. No markdown fences, no prose outside the array.',\n  'Only include items where (demand + competition + margin + ai_producibility) >= 30.',\n  '',\n  'Each array element must have these exact fields:',\n  '  title (string),',\n  '  niche (one of: spreadsheet_templates | notion_templates | business_documents | printable_planners | educational_printables | ebook_guide | ebook_bundle),',\n  '  etsy_search (string — search term that surfaced this opportunity),',\n  '  keywords (array of strings),',\n  '  score (decimal — sum of four scores divided by 4, rounded to 2dp),',\n  '  rationale (string — one sentence),',\n  '  score_demand (integer 1-10),',\n  '  score_competition (integer 1-10),',\n  '  score_margin (integer 1-10),',\n  '  score_ai_producibility (integer 1-10)'\n];\n\nvar requestBody = JSON.stringify({\n  model: 'claude-haiku-4-5-20251001',\n  max_tokens: 1024,\n  system: systemLines.join('\\n'),\n  messages: [{\n    role: 'user',\n    content: 'Score these opportunities and return qualifying items as a JSON array:\\n\\n' + JSON.stringify(items, null, 2)\n  }]\n});\n\nreturn [{ json: { requestBody: requestBody, itemCount: items.length, source: isEtsy ? 'etsy' : 'kdp' } }];"
+      }
+    },
+    {
+      "id": "node-claude",
+      "name": "Claude Haiku — Score Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        500
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-supabase",
+      "name": "Supabase — Save Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1220,
+        500
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ (() => { const text = $json.content[0].text.trim(); const clean = text.startsWith('```') ? text.replace(/^```[a-z]*\\n?/,'').replace(/```$/,'').trim() : text; return clean; })() }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Daily 6am Trigger": {
+      "main": [
+        [
+          {
+            "node": "Etsy Search",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Etsy Ebook Search",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Amazon KDP Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Etsy Search": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Etsy Ebook Search": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Amazon KDP Research": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Normalize & Build Scoring Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize & Build Scoring Request": {
+      "main": [
+        [
+          {
+            "node": "Claude Haiku — Score Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Haiku — Score Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Save Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "1",
+  "id": "cipher-research-agent-v2",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "cipher-studio"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  ebook-pdf:
+    build: .
+    ports:
+      - "3456:3456"
+    restart: unless-stopped
+    environment:
+      - PDF_SERVICE_PORT=3456

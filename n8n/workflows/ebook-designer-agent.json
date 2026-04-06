@@ -1,0 +1,505 @@
+{
+  "name": "Cipher Studio — Ebook Designer Agent",
+  "nodes": [
+    {
+      "id": "eda-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        400
+      ],
+      "webhookId": "cipher-ebook-design",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ebook-design",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      }
+    },
+    {
+      "id": "eda-fetch-template",
+      "name": "Fetch Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        280
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/public/templates/cipher-ebook-v1.html",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "eda-fetch-spec",
+      "name": "Fetch Product Spec",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        520
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/products",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ 'eq.' + $json.body.product_id }}"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "eda-merge",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        680,
+        400
+      ],
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 2,
+        "options": {}
+      }
+    },
+    {
+      "id": "eda-build-request",
+      "name": "Build Claude Request Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const productId = $('Webhook Trigger').first().json.body.product_id;\nconst manuscript = $('Webhook Trigger').first().json.body.manuscript_markdown || '';\n\n// Template HTML — stored in $json.data by the Fetch Template node (responseFormat: text)\nconst tplItem = $('Fetch Template').first();\nconst templateHtml = tplItem.json.data || tplItem.json.body || '';\n\n// Product spec — Supabase returns an array\nconst specItems = $('Fetch Product Spec').all();\nconst specRaw = specItems.length > 0 ? specItems[0].json : [];\nconst productSpec = Array.isArray(specRaw) ? (specRaw[0] || {}) : specRaw;\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 16000,\n  system: \"You are the Ebook Designer Agent for Cipher Studio. You receive a raw Markdown manuscript and an HTML ebook template. Your job is to assemble a complete, publication-ready HTML ebook by injecting the manuscript content into the template.\\n\\nTEMPLATE PAGE TYPES (use the appropriate type for each section):\\n\\n1. COVER PAGE (class=\\\"page cover\\\") \\u2014 Always page 1. Fill in: title, subtitle, description.\\n2. TABLE OF CONTENTS (class=\\\"page toc\\\") \\u2014 Always page 2. Generate from chapter list.\\n3. CHAPTER TITLE PAGE (class=\\\"page chapter-title-page\\\") \\u2014 Use before each chapter.\\n   Fill in: chapter number (large lime number), title, description.\\n4. BODY CONTENT PAGE (class=\\\"page body-page\\\") \\u2014 For regular text. Includes:\\n   - Section headings in body-section-title (Bebas Neue, 22pt)\\n   - Body paragraphs in body-text (Space Grotesk, 10pt, #333)\\n   - Callout boxes (div.callout) for key insights \\u2014 dark bg, lime left border\\n   - Subheadings in body-subhead\\n5. CHECKLIST PAGE (class=\\\"page action-page\\\") \\u2014 For actionable steps. Includes:\\n   - Checkbox items with lime borders\\n   - Pro tip box (lime background, black text)\\n6. DATA & CHARTS PAGE (class=\\\"page data-page\\\") \\u2014 For comparisons, statistics. Includes:\\n   - Stat cards (div.stat-row > div.stat-card) \\u2014 dark bg, lime numbers\\n   - Bar charts (div.bar-chart) \\u2014 lime and obsidian fills\\n   - Tables (table.cipher-table) \\u2014 black header, lime text, status tags\\n7. IMAGE & FEATURE PAGE (class=\\\"page feature-page\\\") \\u2014 For visuals. Includes:\\n   - Full-width image placeholders (mark with [IMAGE: description])\\n   - 2x2 feature card grid (div.feature-grid)\\n   - Side-by-side image + text (div.split-row)\\n8. BACK COVER (class=\\\"page back-cover\\\") \\u2014 Always the last page.\\n\\nBRAND RULES (NEVER DEVIATE):\\n- Primary: #C8F53A (Cipher Lime) \\u2014 accents, highlights, chapter numbers\\n- Dark background: #0A0A0A \\u2014 cover, chapter title pages, back cover\\n- Surface: #1C1C1C \\u2014 callout boxes, stat cards, dark feature cards\\n- Light background: #F5F5F0 or #FFFFFF \\u2014 body pages\\n- Display font: Bebas Neue \\u2014 titles, section headings, chapter numbers\\n- Body font: Space Grotesk \\u2014 body text, labels, captions, tables\\n- Every body/action/data/feature page has footer: \\\"Cipher Studio\\\" left, page number right\\n- Every body/action/data/feature page has header: chapter label left, ebook title right\\n- Max ~350 words per page. Split to new body page if content overflows.\\n\\nMARKDOWN CONVERSION RULES:\\n- ## headings \\u2192 body-section-title\\n- ### headings \\u2192 body-subhead\\n- > blockquotes \\u2192 callout boxes (div.callout)\\n- - [ ] checklists \\u2192 action page with checkbox items\\n- | tables | \\u2192 cipher-table\\n- **bold** \\u2192 <strong>\\n- Numbers/statistics mentioned \\u2192 consider stat cards\\n- Tool/feature comparisons \\u2192 consider feature card grid or table\\n\\nOUTPUT: Return ONLY the complete HTML document. Include all CSS in a <style> tag.\\nInclude the Google Fonts @import for Bebas Neue and Space Grotesk.\\nEach page wrapped in <div class=\\\"page [type-class]\\\">.\\nUse @page { size: 8.5in 11in; margin: 0; } for print sizing.\",\n  messages: [{\n    role: 'user',\n    content: 'PRODUCT SPEC:\\n' + JSON.stringify(productSpec, null, 2)\n      + '\\n\\nMANUSCRIPT:\\n' + manuscript\n      + '\\n\\nTEMPLATE:\\n' + templateHtml\n      + '\\n\\nAssemble the complete ebook HTML now.'\n  }]\n});\n\nreturn [{ json: { requestBody, productId } }];"
+      }
+    },
+    {
+      "id": "eda-claude",
+      "name": "Claude Sonnet — Assemble Ebook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "eda-parse-html",
+      "name": "Parse HTML Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = ($json.content || []).find(b => b.type === 'text')?.text || '';\n\nconst clean = raw.trim().startsWith('```')\n  ? raw.trim().replace(/^```[a-z]*\\n?/, '').replace(/\\n?```$/, '').trim()\n  : raw.trim();\n\nif (!clean.startsWith('<') && !clean.toLowerCase().includes('<html')) {\n  throw new Error('Claude did not return HTML. Got: ' + clean.slice(0, 200));\n}\n\nconst productId = $('Build Claude Request Body').first().json.productId;\n\nreturn [{ json: { html: clean, productId } }];"
+      }
+    },
+    {
+      "id": "eda-save-html",
+      "name": "Save HTML to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        400
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/templates/ebooks/{{ $json.productId }}/ebook.html",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "text/html"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/html",
+        "body": "={{ $json.html }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "eda-convert-pdf",
+      "name": "Convert to PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PDF_SERVICE_URL }}/convert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ html_url: $env.SUPABASE_URL + '/storage/v1/object/public/templates/ebooks/' + $('Parse HTML Output').item.json.productId + '/ebook.html' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdfData"
+            }
+          },
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "eda-save-pdf",
+      "name": "Save PDF to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        400
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SUPABASE_URL + '/storage/v1/object/templates/ebooks/' + $('Parse HTML Output').item.json.productId + '/ebook.pdf' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/pdf"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "pdfData",
+        "options": {}
+      }
+    },
+    {
+      "id": "eda-update-product",
+      "name": "Update Product Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2220,
+        400
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/products?id=eq.' + $('Parse HTML Output').item.json.productId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SECRET_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'designed', ebook_html_url: $env.SUPABASE_URL + '/storage/v1/object/public/templates/ebooks/' + $('Parse HTML Output').item.json.productId + '/ebook.html', ebook_pdf_url: $env.SUPABASE_URL + '/storage/v1/object/public/templates/ebooks/' + $('Parse HTML Output').item.json.productId + '/ebook.pdf' }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "eda-build-email",
+      "name": "Build Notification Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const productId = $json.productId || $('Webhook Trigger').first().json.body.product_id;\nconst specItems = $('Fetch Product Spec').all();\nconst specRaw = specItems.length > 0 ? specItems[0].json : [];\nconst product = Array.isArray(specRaw) ? (specRaw[0] || {}) : specRaw;\n\nconst supabaseUrl = $env.SUPABASE_URL;\nconst htmlUrl = supabaseUrl + '/storage/v1/object/public/templates/ebooks/' + productId + '/ebook.html';\nconst pdfUrl  = supabaseUrl + '/storage/v1/object/public/templates/ebooks/' + productId + '/ebook.pdf';\n\nconst title = product.name || product.title || 'Ebook';\nconst description = product.description || '';\nconst price = product.suggested_price_usd ? '$' + Number(product.suggested_price_usd).toFixed(2) : '';\n\nconst dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n\nconst html = '<!DOCTYPE html><html><body style=\"font-family:sans-serif;background:#0A0A0A;color:#fff;margin:0;padding:0\">'\n  + '<div style=\"max-width:640px;margin:0 auto;padding:32px 24px\">'\n  + '<p style=\"color:#C8F53A;font-size:12px;letter-spacing:2px;margin:0 0 8px\">CIPHER STUDIO</p>'\n  + '<h1 style=\"font-size:32px;color:#fff;margin:0 0 4px\">Ebook Design Complete</h1>'\n  + '<p style=\"color:#666;margin:0 0 32px;font-size:14px\">' + dateStr + '</p>'\n  + '<div style=\"background:#111;border:1px solid #222;border-radius:8px;padding:24px;margin-bottom:24px\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 8px\">EBOOK GUIDE</p>'\n  + '<h2 style=\"margin:0 0 12px;font-size:22px\">' + title + '</h2>'\n  + (description ? '<p style=\"color:#aaa;margin:0 0 16px;line-height:1.6\">' + description + '</p>' : '')\n  + (price ? '<p style=\"margin:0\"><strong style=\"color:#C8F53A\">Price:</strong> ' + price + '</p>' : '')\n  + '</div>'\n  + '<div style=\"background:#111;border:1px solid #C8F53A;border-radius:8px;padding:20px;margin-bottom:16px;text-align:center\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 12px\">DOWNLOAD</p>'\n  + '<a href=\"' + pdfUrl + '\" style=\"background:#C8F53A;color:#0A0A0A;padding:10px 24px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:14px;margin-right:12px\">Download PDF</a>'\n  + '<a href=\"' + htmlUrl + '\" style=\"background:transparent;color:#C8F53A;padding:10px 24px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:14px;border:1px solid #C8F53A\">Preview HTML</a>'\n  + '</div>'\n  + '<p style=\"color:#aaa;font-size:14px;text-align:center;margin:16px 0\">Review and approve, or reply with revision notes.</p>'\n  + '<p style=\"color:#444;font-size:12px;text-align:center\">Supabase products table &nbsp;&middot;&nbsp; cipherstudio.co</p>'\n  + '</div></body></html>';\n\nreturn [{ json: {\n  subject: 'Ebook Ready: ' + title,\n  html,\n  pdfUrl,\n  htmlUrl,\n  productId\n} }];"
+      }
+    },
+    {
+      "id": "eda-gmail",
+      "name": "Gmail — Notify Design Complete",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2660,
+        400
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-oauth2",
+          "name": "Gmail OAuth2 — Cipher Studio"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Template",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Product Spec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Template": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Product Spec": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Request Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Request Body": {
+      "main": [
+        [
+          {
+            "node": "Claude Sonnet — Assemble Ebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet — Assemble Ebook": {
+      "main": [
+        [
+          {
+            "node": "Parse HTML Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse HTML Output": {
+      "main": [
+        [
+          {
+            "node": "Save HTML to Supabase Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save HTML to Supabase Storage": {
+      "main": [
+        [
+          {
+            "node": "Convert to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to PDF": {
+      "main": [
+        [
+          {
+            "node": "Save PDF to Supabase Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save PDF to Supabase Storage": {
+      "main": [
+        [
+          {
+            "node": "Update Product Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Product Record": {
+      "main": [
+        [
+          {
+            "node": "Build Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notification Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Notify Design Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "1",
+  "id": "cipher-ebook-designer-agent-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "cipher-studio"
+    }
+  ]
+}
