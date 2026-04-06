@@ -30,17 +30,17 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/products",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/products",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_PUBLISHABLE_KEY }}"
             }
           ]
         },
@@ -91,7 +91,7 @@
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+              "value": "={{ $vars.ANTHROPIC_API_KEY }}"
             },
             {
               "name": "anthropic-version",
@@ -137,17 +137,17 @@
       ],
       "parameters": {
         "method": "PUT",
-        "url": "={{ $env.SUPABASE_URL + '/storage/v1/object/templates/ebooks/' + $json.productId + '/manuscript.md' }}",
+        "url": "={{ $vars.SUPABASE_URL + '/storage/v1/object/templates/ebooks/' + $json.productId + '/manuscript.md' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_SECRET_KEY }}"
+              "value": "={{ $vars.SUPABASE_SECRET_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_SECRET_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_SECRET_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -173,17 +173,17 @@
       ],
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $env.SUPABASE_URL + '/rest/v1/products?id=eq.' + $('Parse Manuscript').item.json.productId }}",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/products?id=eq.' + $('Parse Manuscript').item.json.productId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_SECRET_KEY }}"
+              "value": "={{ $vars.SUPABASE_SECRET_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_SECRET_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_SECRET_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -198,7 +198,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ status: 'manuscript_complete', manuscript_url: $env.SUPABASE_URL + '/storage/v1/object/public/templates/ebooks/' + $('Parse Manuscript').item.json.productId + '/manuscript.md', manuscript_word_count: $('Parse Manuscript').item.json.wordCount }) }}",
+        "body": "={{ JSON.stringify({ status: 'manuscript_complete', manuscript_url: $vars.SUPABASE_URL + '/storage/v1/object/public/templates/ebooks/' + $('Parse Manuscript').item.json.productId + '/manuscript.md', manuscript_word_count: $('Parse Manuscript').item.json.wordCount }) }}",
         "options": {}
       }
     },
@@ -213,7 +213,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.N8N_WEBHOOK_BASE_URL }}/webhook/ebook-design",
+        "url": "={{ $vars.N8N_WEBHOOK_BASE_URL }}/webhook/ebook-design",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

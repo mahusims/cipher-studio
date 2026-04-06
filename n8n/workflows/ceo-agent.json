@@ -26,17 +26,17 @@
       "position": [440, 180],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/opportunities",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/opportunities",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_PUBLISHABLE_KEY }}"
             }
           ]
         },
@@ -60,17 +60,17 @@
       "position": [440, 340],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/products",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/products",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_PUBLISHABLE_KEY }}"
             }
           ]
         },
@@ -93,17 +93,17 @@
       "position": [440, 500],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/weekly_reports",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/weekly_reports",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_PUBLISHABLE_KEY }}"
             }
           ]
         },
@@ -154,7 +154,7 @@
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+              "value": "={{ $vars.ANTHROPIC_API_KEY }}"
             },
             {
               "name": "anthropic-version",
@@ -192,17 +192,17 @@
       "position": [1560, 220],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/weekly_reports",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/weekly_reports",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Content-Type",

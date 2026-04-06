@@ -99,7 +99,7 @@
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+              "value": "={{ $vars.ANTHROPIC_API_KEY }}"
             },
             {
               "name": "anthropic-version",
@@ -143,17 +143,17 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/products",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/products",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -183,17 +183,17 @@
       ],
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $env.SUPABASE_URL + '/rest/v1/opportunities?id=eq.' + $('Parse Product Spec').item.json.opportunity_id }}",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/opportunities?id=eq.' + $('Parse Product Spec').item.json.opportunity_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_PUBLISHABLE_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_PUBLISHABLE_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -223,7 +223,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.PRODUCT_BUILDER_URL }}/build",
+        "url": "={{ $vars.PRODUCT_BUILDER_URL }}/build",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -326,7 +326,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.N8N_WEBHOOK_BASE_URL }}/webhook/content-writer",
+        "url": "={{ $vars.N8N_WEBHOOK_BASE_URL }}/webhook/content-writer",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

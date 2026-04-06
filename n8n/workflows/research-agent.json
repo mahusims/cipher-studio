@@ -32,7 +32,7 @@
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "={{ $env.ETSY_API_KEY }}"
+              "value": "={{ $vars.ETSY_API_KEY }}"
             }
           ]
         },
@@ -74,7 +74,7 @@
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+              "value": "={{ $vars.ANTHROPIC_API_KEY }}"
             },
             {
               "name": "anthropic-version",
@@ -101,17 +101,17 @@
       "position": [920, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/opportunities",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/opportunities",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_SECRET_KEY }}"
+              "value": "={{ $vars.SUPABASE_SECRET_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.SUPABASE_SECRET_KEY }}"
+              "value": "={{ 'Bearer ' + $vars.SUPABASE_SECRET_KEY }}"
             },
             {
               "name": "Content-Type",
