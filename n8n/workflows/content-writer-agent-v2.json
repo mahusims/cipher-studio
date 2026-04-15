@@ -1,0 +1,392 @@
+{
+  "name": "Cipher Studio — Content Writer Agent",
+  "nodes": [
+    {
+      "id": "cwa-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        400
+      ],
+      "webhookId": "cipher-content-writer",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content-writer",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      }
+    },
+    {
+      "id": "cwa-fetch-spec",
+      "name": "Fetch Product Spec",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/products",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ 'eq.' + $json.body.product_id }}"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cwa-build-request",
+      "name": "Build Claude Request Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const productId = $('Webhook Trigger').first().json.body.product_id;\nconst specItems = $('Fetch Product Spec').all();\nconst specRaw = specItems.length > 0 ? specItems[0].json : {};\nconst product = Array.isArray(specRaw) ? (specRaw[0] || {}) : specRaw;\n\nconst systemPrompt = [\n  \"You are the Content Writer Agent for Cipher Studio, a digital products business selling to freelancers and small business owners.\",\n  \"\",\n  \"WRITING STYLE:\",\n  \"- Direct, confident, no-fluff tone. Write like a smart friend who has done this before.\",\n  \"- Use 'you' throughout. Never use 'one' or passive voice.\",\n  \"- Every paragraph must teach something, provide an action step, or illustrate with a concrete example.\",\n  \"- Short paragraphs (3-4 sentences max).\",\n  \"- Bold key terms the first time they appear: **term**.\",\n  \"- Use specific tool names, numbers, and real examples. Never say 'various tools'.\",\n  \"\",\n  \"STRUCTURE:\",\n  \"- Start each chapter with a 1-2 sentence hook stating what the reader will DO after reading.\",\n  \"- Use ## for chapter titles, ### for section headings.\",\n  \"- Use > blockquotes for key insights (designer converts to callout boxes).\",\n  \"- Use - [ ] checkbox syntax for action items (designer converts to checklists).\",\n  \"- Use | markdown tables | for comparisons (designer converts to branded tables).\",\n  \"- End each chapter with a transition sentence pulling into the next chapter.\",\n  \"- Include at least one checklist per chapter.\",\n  \"- Include at least one comparison table per ebook.\",\n  \"\",\n  \"CONTENT QUALITY:\",\n  \"- Every fact, statistic, and tool recommendation must be real and current (2025-2026).\",\n  \"- If uncertain about a claim, mark it with [VERIFY: claim].\",\n  \"- Do not pad word count. Tight 10,000 words beats bloated 15,000.\",\n  \"- Target word count is in the spec. Stay within 15%.\",\n  \"- Write enough content for the Designer Agent to produce a 30+ page ebook.\",\n  \"- Each chapter should produce 6-10 pages of designed content.\",\n  \"\",\n  \"OUTPUT: Return ONLY the Markdown manuscript starting with ## for the first chapter.\",\n  \"Do not include title page or TOC \\u2014 the designer handles those.\",\n  \"Do not wrap in code fences. Just raw Markdown.\"\n].join('\\n');\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 16000,\n  system: systemPrompt,\n  messages: [{\n    role: 'user',\n    content: 'Write the complete manuscript for this ebook:\\n\\n' + JSON.stringify(product, null, 2)\n  }]\n});\n\nreturn [{ json: { requestBody, productId } }];"
+      }
+    },
+    {
+      "id": "cwa-claude",
+      "name": "Claude Sonnet — Write Manuscript",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "=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"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "cwa-parse",
+      "name": "Parse Manuscript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const raw = ($json.content || []).find(b => b.type === 'text')?.text || '';\n\nconst clean = raw.trim().startsWith('```')\n  ? raw.trim().replace(/^```[a-z]*\\n?/, '').replace(/\\n?```$/, '').trim()\n  : raw.trim();\n\nif (!clean || clean.length < 100) {\n  throw new Error('Claude returned an unexpectedly short manuscript. Got: ' + clean.slice(0, 200));\n}\n\nconst wordCount = clean.split(/\\s+/).filter(w => w.length > 0).length;\nconst productId = $('Webhook Trigger').first().json.body.product_id;\n\nreturn [{ json: { manuscript: clean, wordCount, productId } }];"
+      }
+    },
+    {
+      "id": "cwa-save-manuscript",
+      "name": "Save Manuscript to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        400
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/storage/v1/object/templates/ebooks/{{ $json.productId }}/manuscript.md",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_secret_WTHbZS4p5YDvbXyRwcW0rA_Kyk5Am_9"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_secret_WTHbZS4p5YDvbXyRwcW0rA_Kyk5Am_9"
+            },
+            {
+              "name": "Content-Type",
+              "value": "text/markdown"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/markdown",
+        "body": "={{ $json.manuscript }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "cwa-update-status",
+      "name": "Update Product Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        400
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/products?id=eq.{{ $('Parse Manuscript').item.json.productId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_secret_WTHbZS4p5YDvbXyRwcW0rA_Kyk5Am_9"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_secret_WTHbZS4p5YDvbXyRwcW0rA_Kyk5Am_9"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'manuscript_complete', manuscript_url: 'https://illcsxpidmluhdwgygwf.supabase.co/storage/v1/object/public/templates/ebooks/' + $('Parse Manuscript').item.json.productId + '/manuscript.md', manuscript_word_count: $('Parse Manuscript').item.json.wordCount }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "cwa-trigger-designer",
+      "name": "Trigger Ebook Designer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://primary-production-ef66d.up.railway.app/webhook/ebook-design",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ product_id: $('Parse Manuscript').item.json.productId, manuscript_markdown: $('Parse Manuscript').item.json.manuscript }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "cwa-build-email",
+      "name": "Build Notification Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const productId  = $('Parse Manuscript').item.json.productId;\nconst wordCount  = $('Parse Manuscript').item.json.wordCount;\nconst specItems  = $('Fetch Product Spec').all();\nconst specRaw    = specItems.length > 0 ? specItems[0].json : [];\nconst product    = Array.isArray(specRaw) ? (specRaw[0] || {}) : specRaw;\n\nconst title        = product.name || product.title || 'Ebook';\nconst description  = product.description || '';\nconst spec         = product.spec || {};\nconst chapterCount = spec.chapters\n  ? spec.chapters.length\n  : (spec.ebook && spec.ebook.chapters ? spec.ebook.chapters.length : 0);\n\nconst dateStr = new Date().toLocaleDateString('en-US', {\n  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'\n});\n\nconst html = '<div style=\"max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333;\">'\n  + '<div style=\"background:#0A0A0A;padding:24px;text-align:center;\">'\n  + '<span style=\"color:#C8F53A;font-size:18px;letter-spacing:3px;font-weight:bold;\">CIPHER STUDIO</span>'\n  + '</div>'\n  + '<div style=\"padding:24px;\">'\n  + '<h2 style=\"margin:0 0 4px;font-size:20px;color:#0A0A0A;\">Manuscript Complete</h2>'\n  + '<p style=\"color:#888;margin:0 0 20px;font-size:13px;\">' + dateStr + '</p>'\n  + '<h3 style=\"margin:0 0 8px;font-size:16px;color:#0A0A0A;\">' + title + '</h3>'\n  + (description ? '<p style=\"color:#666;margin:0 0 16px;font-size:14px;\">' + description + '</p>' : '')\n  + '<table style=\"width:100%;margin:0 0 20px;\">'\n  + '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Word count</td>'\n  + '<td style=\"padding:8px 0;font-size:14px;color:#333;font-weight:bold;\">' + Number(wordCount).toLocaleString() + '</td></tr>'\n  + (chapterCount ? '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Chapters</td><td style=\"padding:8px 0;font-size:14px;color:#333;\">' + chapterCount + '</td></tr>' : '')\n  + '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Next step</td><td style=\"padding:8px 0;font-size:14px;color:#333;\">Ebook Designer Agent triggered</td></tr>'\n  + '</table>'\n  + '<p style=\"background:#f5f5f0;border-left:3px solid #C8F53A;padding:12px 16px;font-size:13px;color:#555;margin:0;\">The Ebook Designer Agent has been triggered. You will receive a follow-up email when the PDF is ready.</p>'\n  + '</div>'\n  + '<div style=\"padding:16px 24px;border-top:1px solid #eee;text-align:center;\">'\n  + '<span style=\"font-size:11px;color:#aaa;\">Cipher Studio LLC &middot; Automated notification</span>'\n  + '</div>'\n  + '</div>';\n\nreturn [{ json: {\n  subject: 'Manuscript Written: ' + title + ' (' + Number(wordCount).toLocaleString() + ' words)',\n  html\n} }];"
+      }
+    },
+    {
+      "id": "cwa-gmail",
+      "name": "Gmail — Notify Manuscript Complete",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2240,
+        400
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "IUTmeSTPsDLh4Rqw",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Product Spec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Product Spec": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Request Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Request Body": {
+      "main": [
+        [
+          {
+            "node": "Claude Sonnet — Write Manuscript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet — Write Manuscript": {
+      "main": [
+        [
+          {
+            "node": "Parse Manuscript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Manuscript": {
+      "main": [
+        [
+          {
+            "node": "Save Manuscript to Supabase Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Manuscript to Supabase Storage": {
+      "main": [
+        [
+          {
+            "node": "Update Product Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Product Status": {
+      "main": [
+        [
+          {
+            "node": "Trigger Ebook Designer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Ebook Designer": {
+      "main": [
+        [
+          {
+            "node": "Build Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notification Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Notify Manuscript Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "5cc72b1b-0582-4d5f-9c90-0f81a8ef71fc",
+  "id": "cipher-content-writer-agent-v2",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "cipher-studio"
+    }
+  ]
+}
