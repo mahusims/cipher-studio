@@ -1,0 +1,151 @@
+{
+  "name": "Cipher Studio — Research Directive Receiver",
+  "nodes": [
+    {
+      "id": "rdr-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        400
+      ],
+      "webhookId": "cipher-research-directive",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "research-directive",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      }
+    },
+    {
+      "id": "rdr-save",
+      "name": "Save Directive to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/research_directives",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ directive: $json.body.directive, priority: $json.body.priority || 'normal', source: $json.body.source || 'webhook', status: 'active', expires_at: $json.body.expires_at || null }) }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_secret_WTHbZS4p5YDvbXyRwcW0rA_Kyk5Am_9"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_secret_WTHbZS4p5YDvbXyRwcW0rA_Kyk5Am_9"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rdr-build-email",
+      "name": "Build Confirmation Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const directive = $('Webhook Trigger').first().json.body.directive || '';\nconst priority  = $('Webhook Trigger').first().json.body.priority  || 'normal';\nconst source    = $('Webhook Trigger').first().json.body.source    || 'manual';\n\nconst html = '<div style=\"max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333;\">'\n  + '<div style=\"background:#0A0A0A;padding:24px;text-align:center;\">'\n  + '<span style=\"color:#C8F53A;font-size:18px;letter-spacing:3px;font-weight:bold;\">CIPHER STUDIO</span>'\n  + '</div>'\n  + '<div style=\"padding:24px;\">'\n  + '<h2 style=\"margin:0 0 8px;color:#0A0A0A;\">Research Directive Received</h2>'\n  + '<p style=\"margin:0 0 20px;color:#555;font-size:14px;\">The Research Agent will apply this directive in its next cycle.</p>'\n  + '<table style=\"width:100%;margin:0 0 20px;\">'\n  + '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Directive</td><td style=\"padding:8px 0;font-size:14px;color:#333;\">' + directive + '</td></tr>'\n  + '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Priority</td><td style=\"padding:8px 0;font-size:14px;color:#333;\">' + priority + '</td></tr>'\n  + '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Source</td><td style=\"padding:8px 0;font-size:14px;color:#333;\">' + source + '</td></tr>'\n  + '</table>'\n  + '</div>'\n  + '<div style=\"padding:16px 24px;border-top:1px solid #eee;text-align:center;\">'\n  + '<span style=\"font-size:11px;color:#aaa;\">Cipher Studio LLC &middot; Automated notification</span>'\n  + '</div>'\n  + '</div>';\n\nreturn [{ json: {\n  subject: 'Research Directive Received: ' + directive.substring(0, 60) + (directive.length > 60 ? '...' : ''),\n  html\n} }];",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "rdr-gmail",
+      "name": "Gmail — Directive Confirmed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        920,
+        400
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "IUTmeSTPsDLh4Rqw",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Save Directive to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Directive to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Build Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Directive Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "ed698121-1775-49a4-9f35-cf44f5ad8dbd",
+  "id": "cipher-research-directive-receiver",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "cipher-studio"
+    }
+  ]
+}

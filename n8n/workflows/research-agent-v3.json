@@ -1,0 +1,695 @@
+{
+  "name": "Cipher Studio — Research Agent v3 (Competitive Intelligence)",
+  "nodes": [
+    {
+      "id": "ra3-schedule",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        400
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ra3-fetch-directives",
+      "name": "Fetch CEO Directives",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/research_directives",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "eq.active"
+            },
+            {
+              "name": "order",
+              "value": "created_at.desc"
+            },
+            {
+              "name": "limit",
+              "value": "5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ra3-etsy-templates",
+      "name": "Etsy Template Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://openapi.etsy.com/v3/application/listings/active",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "=YOUR_ETSY_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "keywords",
+              "value": "spreadsheet template notion template business document freelance small business productivity"
+            },
+            {
+              "name": "limit",
+              "value": "25"
+            },
+            {
+              "name": "sort_on",
+              "value": "score"
+            },
+            {
+              "name": "sort_order",
+              "value": "desc"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ra3-etsy-ebooks",
+      "name": "Etsy Ebook Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        400
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://openapi.etsy.com/v3/application/listings/active",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "=YOUR_ETSY_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "keywords",
+              "value": "ebook guide AI automation small business freelancer how to digital download passive income"
+            },
+            {
+              "name": "limit",
+              "value": "25"
+            },
+            {
+              "name": "sort_on",
+              "value": "score"
+            },
+            {
+              "name": "sort_order",
+              "value": "desc"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ra3-build-ci",
+      "name": "Build CI Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        600
+      ],
+      "parameters": {
+        "jsCode": "const dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'No specific directives — use default research strategy.';\n\nconst userLines = [\n  'You are a competitive intelligence researcher for Cipher Studio, a digital products business selling ebooks, spreadsheet templates, and Notion templates to freelancers and small business owners.',\n  '',\n  'CEO DIRECTIVES FOR THIS RESEARCH CYCLE:',\n  directiveText,\n  '',\n  'RESEARCH TASKS (use web_search for each — be thorough):',\n  '',\n  '1. AMAZON KDP TRENDING: Find the top-selling ebooks on Amazon KDP in: AI tools, small business automation, freelancer productivity, Etsy selling guides. Note title, price, review count, and what gap Cipher Studio could fill.',\n  '',\n  '2. ETSY TRENDING DIGITAL PRODUCTS: Find trending digital products on Etsy in 2026. Which categories are growing fastest? What price points win? Where is demand high but quality low?',\n  '',\n  '3. GOOGLE TRENDS: Find rising search terms for: AI automation for business, no-code tools, digital product creation, passive income ebooks, freelancer tools.',\n  '',\n  '4. COMPETITOR GAPS: Find top digital product shops on Etsy and Gumroad. What do they sell, at what prices, and most importantly — what are they NOT offering?',\n  '',\n  '5. CONTENT GAPS: Find questions on Reddit and Quora about AI tools for small business, freelancer automation, and digital product creation. Unanswered questions are ebook topics.',\n  '',\n  'Return ONLY valid JSON array (no markdown fences):',\n  '[{',\n  '  \"title\": \"Suggested product title\",',\n  '  \"niche\": \"ebook_guide|ebook_bundle|spreadsheet_templates|notion_templates|business_documents\",',\n  '  \"source\": \"Amazon KDP|Etsy trends|Google Trends|competitor gap|content gap\",',\n  '  \"evidence\": \"specific data — competitor prices, review counts, trend direction\",',\n  '  \"competitive_advantage\": \"why Cipher Studio can win — what gap exists\",',\n  '  \"suggested_price\": 9.99,',\n  '  \"estimated_demand\": \"high|medium|low\",',\n  '  \"competition_level\": \"high|medium|low\",',\n  '  \"keywords\": [\"search terms\"],',\n  '  \"urgency\": \"trending_now|growing|stable|seasonal\"',\n  '}]',\n  '',\n  'Find 8-12 opportunities. Be specific — actual competitor prices, review counts, and trend data required.'\n];\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 4096,\n  tools: [{ type: 'web_search_20250305', name: 'web_search' }],\n  messages: [{ role: 'user', content: userLines.join('\\n') }]\n});\n\nreturn [{ json: { requestBody } }];"
+      }
+    },
+    {
+      "id": "ra3-claude-ci",
+      "name": "Claude — Competitive Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "=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"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "web-search-2025-03-05"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "ra3-merge",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1160,
+        400
+      ],
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 3
+      }
+    },
+    {
+      "id": "ra3-normalize",
+      "name": "Normalize Research Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// Etsy Templates\nconst tplItems = $('Etsy Template Search').all();\nconst etsyTemplates = tplItems.flatMap(item => {\n  const results = item.json.results || [];\n  return results.map(l => ({\n    source: 'etsy_templates',\n    title: l.title || '',\n    price: l.price ? (l.price.amount / (l.price.divisor || 100)) : 0,\n    favorites: l.num_favorers || 0,\n    tags: (l.tags || []).join(', ')\n  }));\n});\n\n// Etsy Ebooks\nconst ebkItems = $('Etsy Ebook Search').all();\nconst etsyEbooks = ebkItems.flatMap(item => {\n  const results = item.json.results || [];\n  return results.map(l => ({\n    source: 'etsy_ebooks',\n    title: l.title || '',\n    price: l.price ? (l.price.amount / (l.price.divisor || 100)) : 0,\n    favorites: l.num_favorers || 0,\n    tags: (l.tags || []).join(', ')\n  }));\n});\n\n// Competitive Intelligence (Claude + web search)\nconst ciItems = $('Claude \\u2014 Competitive Intelligence').all();\nconst ciOpportunities = [];\nfor (const item of ciItems) {\n  const content = item.json.content || [];\n  const textBlocks = content.filter(b => b.type === 'text');\n  for (const block of textBlocks) {\n    const raw = block.text || '';\n    const firstBracket = raw.indexOf('[');\n    const lastBracket  = raw.lastIndexOf(']');\n    if (firstBracket !== -1 && lastBracket !== -1) {\n      try {\n        const parsed = JSON.parse(raw.substring(firstBracket, lastBracket + 1));\n        if (Array.isArray(parsed)) {\n          parsed.forEach(o => ciOpportunities.push({ source: 'competitive_intel', ...o }));\n          break;\n        }\n      } catch(e) { /* skip */ }\n    }\n  }\n}\n\nreturn [{ json: {\n  etsyTemplates,\n  etsyEbooks,\n  ciOpportunities,\n  totalEtsy: etsyTemplates.length + etsyEbooks.length,\n  totalCI: ciOpportunities.length\n} }];"
+      }
+    },
+    {
+      "id": "ra3-build-scoring",
+      "name": "Build Scoring Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const data = $('Normalize Research Data').first().json;\nconst dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'Default research cycle — no specific directives.';\n\nconst systemLines = [\n  'You are the Opportunity Scoring Engine for Cipher Studio.',\n  '',\n  'You receive raw research data from three sources: Etsy marketplace listings, Etsy ebook listings, and competitive intelligence (Amazon KDP, Google Trends, competitor gaps, content gaps).',\n  '',\n  'Identify the TOP 5-8 product opportunities and score them rigorously.',\n  '',\n  'SCORING CRITERIA (1-10 each):',\n  '',\n  '1. DEMAND (weight: 30%)',\n  '   10 = Proven massive demand (1000+ reviews on competitors, trending on Google)',\n  '   7  = Strong demand (100-1000 reviews, steady search interest)',\n  '   4  = Moderate demand (10-100 reviews, niche audience)',\n  '   1  = Speculative (no evidence of real buyers)',\n  '',\n  '2. COMPETITION GAP (weight: 25%)',\n  '   10 = No quality competitors (existing products are outdated or poorly made)',\n  '   7  = Few quality competitors (room for a clearly better product)',\n  '   4  = Moderate competition (need strong differentiation to win)',\n  '   1  = Saturated (top products have 5000+ reviews and excellent quality)',\n  '',\n  '3. CIPHER STUDIO FIT (weight: 25%)',\n  '   10 = Perfect for AI agents (text-heavy, structured, template-based)',\n  '   7  = Good fit (mostly text, some design elements)',\n  '   4  = Moderate fit (significant design work needed)',\n  '   1  = Poor fit (requires human expertise or physical components)',\n  '',\n  '4. REVENUE POTENTIAL (weight: 20%)',\n  '   10 = High price ($15+) with bundle potential and recurring demand',\n  '   7  = Good price ($8-15) with some bundle potential',\n  '   4  = Low price ($3-7) with limited upsell',\n  '   1  = Race to bottom pricing, commoditized',\n  '',\n  'FINAL SCORE = (demand * 0.30) + (competition_gap * 0.25) + (fit * 0.25) + (revenue * 0.20)',\n  'Only include opportunities with final score >= 6.5.',\n  '',\n  'Return ONLY valid JSON array (no markdown fences):',\n  '[{',\n  '  \"title\": \"Product title optimized for search\",',\n  '  \"niche\": \"ebook_guide|ebook_bundle|spreadsheet_templates|notion_templates|business_documents\",',\n  '  \"description\": \"2-3 sentence product description for the listing\",',\n  '  \"score\": 8.5,',\n  '  \"score_demand\": 9,',\n  '  \"score_competition_gap\": 8,',\n  '  \"score_fit\": 9,',\n  '  \"score_revenue\": 8,',\n  '  \"rationale\": \"2-3 sentences with specific evidence\",',\n  '  \"competitive_strategy\": \"How Cipher Studio beats existing competitors\",',\n  '  \"bundle_opportunity\": \"What product types pair with this\",',\n  '  \"keywords\": [\"search terms buyers use\"],',\n  '  \"suggested_price\": 12.99,',\n  '  \"etsy_search\": \"what a buyer types into Etsy\",',\n  '  \"evidence\": \"specific data: competitor prices, review counts, trend direction\"',\n  '}]'\n];\n\nconst userContent = [\n  'CEO DIRECTIVES: ' + directiveText,\n  '',\n  'ETSY DATA (' + data.totalEtsy + ' listings):',\n  'Templates: ' + JSON.stringify(data.etsyTemplates.slice(0, 12)),\n  'Ebooks: ' + JSON.stringify(data.etsyEbooks.slice(0, 12)),\n  '',\n  'COMPETITIVE INTELLIGENCE (' + data.totalCI + ' opportunities from web research):',\n  JSON.stringify(data.ciOpportunities),\n  '',\n  'Score all opportunities and return the top 5-8 as a JSON array.'\n].join('\\n');\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 8192,\n  system: systemLines.join('\\n'),\n  messages: [{ role: 'user', content: userContent }]\n});\n\nreturn [{ json: { requestBody } }];"
+      }
+    },
+    {
+      "id": "ra3-claude-scoring",
+      "name": "Claude Sonnet — Competitive Scoring",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1880,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "=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"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "ra3-parse",
+      "name": "Parse Scored Opportunities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2120,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const content = $json.content || [];\nconst textBlock = content.find(b => b.type === 'text');\nconst raw = textBlock ? textBlock.text : '';\n\nconst firstBracket = raw.indexOf('[');\nconst lastBracket  = raw.lastIndexOf(']');\n\nlet opportunities = [];\nif (firstBracket !== -1 && lastBracket !== -1) {\n  try {\n    opportunities = JSON.parse(raw.substring(firstBracket, lastBracket + 1));\n  } catch(e) {\n    opportunities = [];\n  }\n}\n\nopportunities = opportunities.filter(o => o.score >= 6.5 && o.title && o.niche);\n\nif (opportunities.length === 0) {\n  return [{ json: { title: '_no_results', niche: 'none', score: 0, status: 'pending', skip: true } }];\n}\n\nreturn opportunities.map(o => ({ json: o }));",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "ra3-save-opp",
+      "name": "Save Opportunity to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2360,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/opportunities",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ title: $json.title, niche: $json.niche, description: $json.description || '', score: $json.score, score_demand: $json.score_demand, score_competition_gap: $json.score_competition_gap, score_fit: $json.score_fit, score_revenue: $json.score_revenue, rationale: $json.rationale, competitive_strategy: $json.competitive_strategy || '', bundle_opportunity: $json.bundle_opportunity || '', keywords: $json.keywords || [], suggested_price: $json.suggested_price, etsy_search: $json.etsy_search || '', evidence: $json.evidence || '', source: $json.source || 'research_agent_v3', status: 'pending' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_secret_WTHbZS4p5YDvbXyRwcW0rA_Kyk5Am_9"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_secret_WTHbZS4p5YDvbXyRwcW0rA_Kyk5Am_9"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ra3-extract-row",
+      "name": "Extract Saved Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// Supabase POST returns an array even for single inserts\nconst row = Array.isArray($json) ? ($json[0] || $json) : $json;\nreturn [{ json: row }];",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "ra3-if-trigger",
+      "name": "IF: Auto-Trigger",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2840,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "score-check",
+              "leftValue": "={{ $json.score }}",
+              "rightValue": 7.5,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "ra3-trigger-pc",
+      "name": "Trigger Product Creation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://primary-production-ef66d.up.railway.app/webhook/product-creation",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ type: 'INSERT', record: {   id: $json.id,   title: $json.title,   niche: $json.niche,   score: $json.score,   rationale: $json.rationale,   status: 'pending',   etsy_search: $json.etsy_search || '',   keywords: $json.keywords || [] } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ra3-build-email",
+      "name": "Build Research Summary Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2840,
+        600
+      ],
+      "parameters": {
+        "jsCode": "const allSaved = $('Extract Saved Row').all();\nconst opportunities = allSaved\n  .map(item => item.json)\n  .filter(r => !r.skip && r.title !== '_no_results');\n\nconst highScorers = opportunities.filter(o => (o.score || 0) >= 7.5);\nconst dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n\nconst dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'Default research cycle (no CEO directives active)';\n\nconst topThree = opportunities.slice(0, 3);\nconst oppCards = topThree.map(o =>\n  '<div style=\"border:1px solid #222;border-radius:6px;padding:16px;margin-bottom:12px;\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 4px;\">' + (o.niche || '').toUpperCase().replace(/_/g, ' ') + '</p>'\n  + '<h3 style=\"margin:0 0 8px;font-size:14px;color:#fff;\">' + (o.title || '') + '</h3>'\n  + '<p style=\"color:#C8F53A;font-weight:bold;font-size:20px;margin:0 0 8px;\">' + (o.score || 0) + '/10</p>'\n  + '<p style=\"color:#aaa;font-size:13px;margin:0 0 8px;\">' + (o.rationale || '') + '</p>'\n  + '<p style=\"color:#666;font-size:12px;margin:0;\">Price: $' + (o.suggested_price || 0) + ' &middot; ' + (o.evidence || '') + '</p>'\n  + '</div>'\n).join('');\n\nconst html = '<div style=\"max-width:600px;margin:0 auto;font-family:Arial,sans-serif;background:#0A0A0A;color:#fff;\">'\n  + '<div style=\"padding:24px;text-align:center;\">'\n  + '<span style=\"color:#C8F53A;font-size:18px;letter-spacing:3px;font-weight:bold;\">CIPHER STUDIO</span>'\n  + '</div>'\n  + '<div style=\"padding:0 24px 24px;\">'\n  + '<h1 style=\"font-size:22px;margin:0 0 4px;\">Daily Research Report</h1>'\n  + '<p style=\"color:#666;margin:0 0 24px;font-size:13px;\">' + dateStr + '</p>'\n  + '<table style=\"width:100%;border-collapse:collapse;margin-bottom:20px;\"><tr>'\n  + '<td style=\"text-align:center;padding:16px;background:#111;border:1px solid #222;border-radius:6px;\">'\n  + '<p style=\"color:#C8F53A;font-size:28px;font-weight:bold;margin:0;\">' + opportunities.length + '</p>'\n  + '<p style=\"color:#888;font-size:11px;margin:4px 0 0;\">Opportunities</p></td>'\n  + '<td style=\"width:12px;\"></td>'\n  + '<td style=\"text-align:center;padding:16px;background:#111;border:1px solid #222;border-radius:6px;\">'\n  + '<p style=\"color:#C8F53A;font-size:28px;font-weight:bold;margin:0;\">' + highScorers.length + '</p>'\n  + '<p style=\"color:#888;font-size:11px;margin:4px 0 0;\">Auto-Triggered</p></td>'\n  + '</tr></table>'\n  + '<div style=\"background:#111;border:1px solid #333;border-radius:6px;padding:14px;margin-bottom:20px;\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 6px;\">CEO DIRECTIVES</p>'\n  + '<p style=\"color:#aaa;font-size:13px;margin:0;\">' + directiveText + '</p>'\n  + '</div>'\n  + '<h2 style=\"font-size:15px;margin:0 0 12px;\">Top Opportunities</h2>'\n  + (oppCards || '<p style=\"color:#666;font-size:14px;\">No high-scoring opportunities found today.</p>')\n  + '<p style=\"color:#444;font-size:11px;text-align:center;margin-top:20px;\">Review all in Supabase &rarr; opportunities table &middot; cipherstudio.co</p>'\n  + '</div>'\n  + '</div>';\n\nreturn [{ json: {\n  subject: 'Research Report: ' + opportunities.length + ' opportunities | ' + dateStr,\n  html\n} }];"
+      }
+    },
+    {
+      "id": "ra3-gmail",
+      "name": "Gmail — Daily Research Summary",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3080,
+        600
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "IUTmeSTPsDLh4Rqw",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch CEO Directives",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch CEO Directives": {
+      "main": [
+        [
+          {
+            "node": "Etsy Template Search",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Etsy Ebook Search",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build CI Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Etsy Template Search": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Etsy Ebook Search": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Build CI Request": {
+      "main": [
+        [
+          {
+            "node": "Claude — Competitive Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude — Competitive Intelligence": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Normalize Research Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Research Data": {
+      "main": [
+        [
+          {
+            "node": "Build Scoring Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Scoring Request": {
+      "main": [
+        [
+          {
+            "node": "Claude Sonnet — Competitive Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet — Competitive Scoring": {
+      "main": [
+        [
+          {
+            "node": "Parse Scored Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Scored Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Save Opportunity to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Opportunity to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Extract Saved Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Saved Row": {
+      "main": [
+        [
+          {
+            "node": "IF: Auto-Trigger",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Research Summary Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Auto-Trigger": {
+      "main": [
+        [
+          {
+            "node": "Trigger Product Creation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Research Summary Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Daily Research Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "52e9fbce-fcb2-4841-a64c-0da1247f399a",
+  "id": "cipher-research-agent-v3",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "cipher-studio"
+    }
+  ]
+}
