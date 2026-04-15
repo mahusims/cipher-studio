@@ -73,110 +73,63 @@
       }
     },
     {
-      "id": "ra3-etsy-templates",
-      "name": "Etsy Template Search",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "ra3-build-etsy-ws",
+      "name": "Build Etsy Web Search Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         680,
         200
       ],
       "parameters": {
-        "method": "GET",
-        "url": "=https://openapi.etsy.com/v3/application/listings/active",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "=YOUR_ETSY_API_KEY_HERE"
-            }
-          ]
-        },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "keywords",
-              "value": "spreadsheet template notion template business document freelance small business productivity"
-            },
-            {
-              "name": "limit",
-              "value": "25"
-            },
-            {
-              "name": "sort_on",
-              "value": "score"
-            },
-            {
-              "name": "sort_order",
-              "value": "desc"
-            }
-          ]
-        }
+        "jsCode": "const dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'No specific directives.';\n\nconst userLines = [\n  'You are a marketplace intelligence researcher for Cipher Studio, a digital products business selling ebooks, spreadsheet templates, and Notion templates to freelancers and small business owners.',\n  '',\n  'CEO DIRECTIVES: ' + directiveText,\n  '',\n  'RESEARCH TASK: Search etsy.com directly — browse it as a human buyer and seller would. Find:',\n  '',\n  '1. TOP-SELLING CATEGORIES: Search etsy.com for \"digital download business templates\", \"freelancer ebook\", \"spreadsheet templates small business\", \"Notion template productivity\". Note which listings have the most sales (look for \"bestseller\" badges and high review counts).',\n  '',\n  '2. PRICE INTELLIGENCE: What price points appear most often for top-selling digital products on Etsy? What is the typical price for an ebook vs a spreadsheet template vs a Notion template?',\n  '',\n  '3. DEMAND-SUPPLY GAPS: Search for niches where buyers leave reviews saying they wished the product covered more, or where search results show few high-quality options.',\n  '',\n  '4. TRENDING SEARCHES: What digital product keywords are trending on Etsy right now in 2026? Look for recently added bestsellers and rising categories.',\n  '',\n  '5. COMPETITOR WEAKNESSES: Find top Etsy shops selling digital products to freelancers/small businesses. What negative reviews mention? What do their products lack?',\n  '',\n  'Return ONLY valid JSON array (no markdown fences):',\n  '[{',\n  '  \"title\": \"Suggested product title\",',\n  '  \"niche\": \"ebook_guide|ebook_bundle|spreadsheet_templates|notion_templates|business_documents\",',\n  '  \"source\": \"etsy_marketplace\",',\n  '  \"evidence\": \"specific Etsy data: competitor prices, review counts, bestseller count\",',\n  '  \"competitive_advantage\": \"what gap Cipher Studio can fill\",',\n  '  \"suggested_price\": 12.99,',\n  '  \"estimated_demand\": \"high|medium|low\",',\n  '  \"competition_level\": \"high|medium|low\",',\n  '  \"keywords\": [\"etsy search terms\"],',\n  '  \"urgency\": \"trending_now|growing|stable|seasonal\",',\n  '  \"etsy_search\": \"exact phrase a buyer types into Etsy\"',\n  '}]',\n  '',\n  'Find 5-8 Etsy-specific opportunities with real data from etsy.com.'\n];\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 4096,\n  tools: [{ type: 'web_search_20250305', name: 'web_search' }],\n  messages: [{ role: 'user', content: userLines.join('\\n') }]\n});\n\nreturn [{ json: { requestBody } }];"
       }
     },
     {
-      "id": "ra3-etsy-ebooks",
-      "name": "Etsy Ebook Search",
+      "id": "ra3-claude-etsy",
+      "name": "Claude — Etsy Marketplace Intelligence",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        680,
-        400
+        920,
+        200
       ],
       "parameters": {
-        "method": "GET",
-        "url": "=https://openapi.etsy.com/v3/application/listings/active",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          }
-        },
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "=YOUR_ETSY_API_KEY_HERE"
+              "value": "=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"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "web-search-2025-03-05"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
             }
           ]
         },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "keywords",
-              "value": "ebook guide AI automation small business freelancer how to digital download passive income"
-            },
-            {
-              "name": "limit",
-              "value": "25"
-            },
-            {
-              "name": "sort_on",
-              "value": "score"
-            },
-            {
-              "name": "sort_order",
-              "value": "desc"
-            }
-          ]
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 300000
         }
       }
     },
     {
-      "id": "ra3-build-ci",
-      "name": "Build CI Request",
+      "id": "ra3-build-kdp",
+      "name": "Build KDP/Trends Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -184,12 +137,12 @@
         600
       ],
       "parameters": {
-        "jsCode": "const dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'No specific directives — use default research strategy.';\n\nconst userLines = [\n  'You are a competitive intelligence researcher for Cipher Studio, a digital products business selling ebooks, spreadsheet templates, and Notion templates to freelancers and small business owners.',\n  '',\n  'CEO DIRECTIVES FOR THIS RESEARCH CYCLE:',\n  directiveText,\n  '',\n  'RESEARCH TASKS (use web_search for each — be thorough):',\n  '',\n  '1. AMAZON KDP TRENDING: Find the top-selling ebooks on Amazon KDP in: AI tools, small business automation, freelancer productivity, Etsy selling guides. Note title, price, review count, and what gap Cipher Studio could fill.',\n  '',\n  '2. ETSY TRENDING DIGITAL PRODUCTS: Find trending digital products on Etsy in 2026. Which categories are growing fastest? What price points win? Where is demand high but quality low?',\n  '',\n  '3. GOOGLE TRENDS: Find rising search terms for: AI automation for business, no-code tools, digital product creation, passive income ebooks, freelancer tools.',\n  '',\n  '4. COMPETITOR GAPS: Find top digital product shops on Etsy and Gumroad. What do they sell, at what prices, and most importantly — what are they NOT offering?',\n  '',\n  '5. CONTENT GAPS: Find questions on Reddit and Quora about AI tools for small business, freelancer automation, and digital product creation. Unanswered questions are ebook topics.',\n  '',\n  'Return ONLY valid JSON array (no markdown fences):',\n  '[{',\n  '  \"title\": \"Suggested product title\",',\n  '  \"niche\": \"ebook_guide|ebook_bundle|spreadsheet_templates|notion_templates|business_documents\",',\n  '  \"source\": \"Amazon KDP|Etsy trends|Google Trends|competitor gap|content gap\",',\n  '  \"evidence\": \"specific data — competitor prices, review counts, trend direction\",',\n  '  \"competitive_advantage\": \"why Cipher Studio can win — what gap exists\",',\n  '  \"suggested_price\": 9.99,',\n  '  \"estimated_demand\": \"high|medium|low\",',\n  '  \"competition_level\": \"high|medium|low\",',\n  '  \"keywords\": [\"search terms\"],',\n  '  \"urgency\": \"trending_now|growing|stable|seasonal\"',\n  '}]',\n  '',\n  'Find 8-12 opportunities. Be specific — actual competitor prices, review counts, and trend data required.'\n];\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 4096,\n  tools: [{ type: 'web_search_20250305', name: 'web_search' }],\n  messages: [{ role: 'user', content: userLines.join('\\n') }]\n});\n\nreturn [{ json: { requestBody } }];"
+        "jsCode": "const dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'No specific directives — use default research strategy.';\n\nconst userLines = [\n  'You are a competitive intelligence researcher for Cipher Studio, a digital products business selling ebooks, spreadsheet templates, and Notion templates to freelancers and small business owners.',\n  '',\n  'CEO DIRECTIVES FOR THIS RESEARCH CYCLE:',\n  directiveText,\n  '',\n  'RESEARCH TASKS (use web_search for each — be thorough):',\n  '',\n  '1. AMAZON KDP TRENDING: Find the top-selling ebooks on Amazon KDP in: AI tools for business, small business automation, freelancer productivity, passive income guides. Note title, price, review count, and what gap Cipher Studio could fill.',\n  '',\n  '2. GOOGLE TRENDS: Find rising search terms for: AI automation for business, no-code tools for entrepreneurs, digital product creation, passive income online, freelancer tools 2026.',\n  '',\n  '3. GUMROAD COMPETITOR GAPS: Find top digital product creators on Gumroad selling to freelancers and small business owners. What do they sell, at what prices, and most importantly — what are they NOT offering?',\n  '',\n  '4. REDDIT CONTENT GAPS: Search Reddit (r/Entrepreneur, r/smallbusiness, r/freelance, r/passive_income) for unanswered questions and pain points about AI tools, business automation, and productivity. Unanswered questions are ebook topics.',\n  '',\n  '5. EMERGING NICHES: What new categories of digital products are gaining traction in 2026 that have low competition but growing buyer interest?',\n  '',\n  'Return ONLY valid JSON array (no markdown fences):',\n  '[{',\n  '  \"title\": \"Suggested product title\",',\n  '  \"niche\": \"ebook_guide|ebook_bundle|spreadsheet_templates|notion_templates|business_documents\",',\n  '  \"source\": \"Amazon KDP|Google Trends|Gumroad gap|Reddit gap|emerging niche\",',\n  '  \"evidence\": \"specific data — competitor prices, review counts, trend direction\",',\n  '  \"competitive_advantage\": \"why Cipher Studio can win — what gap exists\",',\n  '  \"suggested_price\": 9.99,',\n  '  \"estimated_demand\": \"high|medium|low\",',\n  '  \"competition_level\": \"high|medium|low\",',\n  '  \"keywords\": [\"search terms buyers use\"],',\n  '  \"urgency\": \"trending_now|growing|stable|seasonal\",',\n  '  \"etsy_search\": \"what a buyer would type into Etsy to find this\"',\n  '}]',\n  '',\n  'Find 5-8 opportunities from Amazon KDP, Google Trends, Gumroad, and Reddit. Be specific — actual data required.'\n];\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 4096,\n  tools: [{ type: 'web_search_20250305', name: 'web_search' }],\n  messages: [{ role: 'user', content: userLines.join('\\n') }]\n});\n\nreturn [{ json: { requestBody } }];"
       }
     },
     {
-      "id": "ra3-claude-ci",
-      "name": "Claude — Competitive Intelligence",
+      "id": "ra3-claude-kdp",
+      "name": "Claude — KDP/Trends/Reddit Intelligence",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -240,7 +193,7 @@
       ],
       "parameters": {
         "mode": "append",
-        "numberInputs": 3
+        "numberInputs": 2
       }
     },
     {
@@ -253,7 +206,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "// Etsy Templates\nconst tplItems = $('Etsy Template Search').all();\nconst etsyTemplates = tplItems.flatMap(item => {\n  const results = item.json.results || [];\n  return results.map(l => ({\n    source: 'etsy_templates',\n    title: l.title || '',\n    price: l.price ? (l.price.amount / (l.price.divisor || 100)) : 0,\n    favorites: l.num_favorers || 0,\n    tags: (l.tags || []).join(', ')\n  }));\n});\n\n// Etsy Ebooks\nconst ebkItems = $('Etsy Ebook Search').all();\nconst etsyEbooks = ebkItems.flatMap(item => {\n  const results = item.json.results || [];\n  return results.map(l => ({\n    source: 'etsy_ebooks',\n    title: l.title || '',\n    price: l.price ? (l.price.amount / (l.price.divisor || 100)) : 0,\n    favorites: l.num_favorers || 0,\n    tags: (l.tags || []).join(', ')\n  }));\n});\n\n// Competitive Intelligence (Claude + web search)\nconst ciItems = $('Claude \\u2014 Competitive Intelligence').all();\nconst ciOpportunities = [];\nfor (const item of ciItems) {\n  const content = item.json.content || [];\n  const textBlocks = content.filter(b => b.type === 'text');\n  for (const block of textBlocks) {\n    const raw = block.text || '';\n    const firstBracket = raw.indexOf('[');\n    const lastBracket  = raw.lastIndexOf(']');\n    if (firstBracket !== -1 && lastBracket !== -1) {\n      try {\n        const parsed = JSON.parse(raw.substring(firstBracket, lastBracket + 1));\n        if (Array.isArray(parsed)) {\n          parsed.forEach(o => ciOpportunities.push({ source: 'competitive_intel', ...o }));\n          break;\n        }\n      } catch(e) { /* skip */ }\n    }\n  }\n}\n\nreturn [{ json: {\n  etsyTemplates,\n  etsyEbooks,\n  ciOpportunities,\n  totalEtsy: etsyTemplates.length + etsyEbooks.length,\n  totalCI: ciOpportunities.length\n} }];"
+        "jsCode": "// Branch A: Etsy Marketplace Intelligence (Claude + web search)\nconst etsyItems = $('Claude — Etsy Marketplace Intelligence').all();\nconst etsyOpportunities = [];\nfor (const item of etsyItems) {\n  const content = item.json.content || [];\n  const textBlocks = content.filter(b => b.type === 'text');\n  for (const block of textBlocks) {\n    const raw = block.text || '';\n    const firstBracket = raw.indexOf('[');\n    const lastBracket  = raw.lastIndexOf(']');\n    if (firstBracket !== -1 && lastBracket !== -1) {\n      try {\n        const parsed = JSON.parse(raw.substring(firstBracket, lastBracket + 1));\n        if (Array.isArray(parsed)) {\n          parsed.forEach(o => etsyOpportunities.push({ source: 'etsy_web_search', ...o }));\n          break;\n        }\n      } catch(e) { /* skip */ }\n    }\n  }\n}\n\n// Branch B: KDP + Google Trends + Reddit Intelligence (Claude + web search)\nconst kdpItems = $('Claude — KDP/Trends/Reddit Intelligence').all();\nconst kdpOpportunities = [];\nfor (const item of kdpItems) {\n  const content = item.json.content || [];\n  const textBlocks = content.filter(b => b.type === 'text');\n  for (const block of textBlocks) {\n    const raw = block.text || '';\n    const firstBracket = raw.indexOf('[');\n    const lastBracket  = raw.lastIndexOf(']');\n    if (firstBracket !== -1 && lastBracket !== -1) {\n      try {\n        const parsed = JSON.parse(raw.substring(firstBracket, lastBracket + 1));\n        if (Array.isArray(parsed)) {\n          parsed.forEach(o => kdpOpportunities.push({ source: 'kdp_trends_reddit', ...o }));\n          break;\n        }\n      } catch(e) { /* skip */ }\n    }\n  }\n}\n\nreturn [{ json: {\n  etsyOpportunities,\n  kdpOpportunities,\n  totalEtsy: etsyOpportunities.length,\n  totalKDP: kdpOpportunities.length\n} }];"
       }
     },
     {
@@ -266,7 +219,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "const data = $('Normalize Research Data').first().json;\nconst dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'Default research cycle — no specific directives.';\n\nconst systemLines = [\n  'You are the Opportunity Scoring Engine for Cipher Studio.',\n  '',\n  'You receive raw research data from three sources: Etsy marketplace listings, Etsy ebook listings, and competitive intelligence (Amazon KDP, Google Trends, competitor gaps, content gaps).',\n  '',\n  'Identify the TOP 5-8 product opportunities and score them rigorously.',\n  '',\n  'SCORING CRITERIA (1-10 each):',\n  '',\n  '1. DEMAND (weight: 30%)',\n  '   10 = Proven massive demand (1000+ reviews on competitors, trending on Google)',\n  '   7  = Strong demand (100-1000 reviews, steady search interest)',\n  '   4  = Moderate demand (10-100 reviews, niche audience)',\n  '   1  = Speculative (no evidence of real buyers)',\n  '',\n  '2. COMPETITION GAP (weight: 25%)',\n  '   10 = No quality competitors (existing products are outdated or poorly made)',\n  '   7  = Few quality competitors (room for a clearly better product)',\n  '   4  = Moderate competition (need strong differentiation to win)',\n  '   1  = Saturated (top products have 5000+ reviews and excellent quality)',\n  '',\n  '3. CIPHER STUDIO FIT (weight: 25%)',\n  '   10 = Perfect for AI agents (text-heavy, structured, template-based)',\n  '   7  = Good fit (mostly text, some design elements)',\n  '   4  = Moderate fit (significant design work needed)',\n  '   1  = Poor fit (requires human expertise or physical components)',\n  '',\n  '4. REVENUE POTENTIAL (weight: 20%)',\n  '   10 = High price ($15+) with bundle potential and recurring demand',\n  '   7  = Good price ($8-15) with some bundle potential',\n  '   4  = Low price ($3-7) with limited upsell',\n  '   1  = Race to bottom pricing, commoditized',\n  '',\n  'FINAL SCORE = (demand * 0.30) + (competition_gap * 0.25) + (fit * 0.25) + (revenue * 0.20)',\n  'Only include opportunities with final score >= 6.5.',\n  '',\n  'Return ONLY valid JSON array (no markdown fences):',\n  '[{',\n  '  \"title\": \"Product title optimized for search\",',\n  '  \"niche\": \"ebook_guide|ebook_bundle|spreadsheet_templates|notion_templates|business_documents\",',\n  '  \"description\": \"2-3 sentence product description for the listing\",',\n  '  \"score\": 8.5,',\n  '  \"score_demand\": 9,',\n  '  \"score_competition_gap\": 8,',\n  '  \"score_fit\": 9,',\n  '  \"score_revenue\": 8,',\n  '  \"rationale\": \"2-3 sentences with specific evidence\",',\n  '  \"competitive_strategy\": \"How Cipher Studio beats existing competitors\",',\n  '  \"bundle_opportunity\": \"What product types pair with this\",',\n  '  \"keywords\": [\"search terms buyers use\"],',\n  '  \"suggested_price\": 12.99,',\n  '  \"etsy_search\": \"what a buyer types into Etsy\",',\n  '  \"evidence\": \"specific data: competitor prices, review counts, trend direction\"',\n  '}]'\n];\n\nconst userContent = [\n  'CEO DIRECTIVES: ' + directiveText,\n  '',\n  'ETSY DATA (' + data.totalEtsy + ' listings):',\n  'Templates: ' + JSON.stringify(data.etsyTemplates.slice(0, 12)),\n  'Ebooks: ' + JSON.stringify(data.etsyEbooks.slice(0, 12)),\n  '',\n  'COMPETITIVE INTELLIGENCE (' + data.totalCI + ' opportunities from web research):',\n  JSON.stringify(data.ciOpportunities),\n  '',\n  'Score all opportunities and return the top 5-8 as a JSON array.'\n].join('\\n');\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 8192,\n  system: systemLines.join('\\n'),\n  messages: [{ role: 'user', content: userContent }]\n});\n\nreturn [{ json: { requestBody } }];"
+        "jsCode": "const data = $('Normalize Research Data').first().json;\nconst dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'Default research cycle — no specific directives.';\n\nconst systemLines = [\n  'You are the Opportunity Scoring Engine for Cipher Studio.',\n  '',\n  'You receive raw research data from two sources: (A) Etsy marketplace intelligence gathered by searching etsy.com directly, and (B) competitive intelligence from Amazon KDP, Google Trends, Gumroad, and Reddit.',\n  '',\n  'Identify the TOP 5-8 product opportunities and score them rigorously.',\n  '',\n  'SCORING CRITERIA (1-10 each):',\n  '',\n  '1. DEMAND (weight: 30%)',\n  '   10 = Proven massive demand (1000+ reviews on competitors, trending on Google)',\n  '   7  = Strong demand (100-1000 reviews, steady search interest)',\n  '   4  = Moderate demand (10-100 reviews, niche audience)',\n  '   1  = Speculative (no evidence of real buyers)',\n  '',\n  '2. COMPETITION GAP (weight: 25%)',\n  '   10 = No quality competitors (existing products are outdated or poorly made)',\n  '   7  = Few quality competitors (room for a clearly better product)',\n  '   4  = Moderate competition (need strong differentiation to win)',\n  '   1  = Saturated (top products have 5000+ reviews and excellent quality)',\n  '',\n  '3. CIPHER STUDIO FIT (weight: 25%)',\n  '   10 = Perfect for AI agents (text-heavy, structured, template-based)',\n  '   7  = Good fit (mostly text, some design elements)',\n  '   4  = Moderate fit (significant design work needed)',\n  '   1  = Poor fit (requires human expertise or physical components)',\n  '',\n  '4. REVENUE POTENTIAL (weight: 20%)',\n  '   10 = High price ($15+) with bundle potential and recurring demand',\n  '   7  = Good price ($8-15) with some bundle potential',\n  '   4  = Low price ($3-7) with limited upsell',\n  '   1  = Race to bottom pricing, commoditized',\n  '',\n  'FINAL SCORE = (demand * 0.30) + (competition_gap * 0.25) + (fit * 0.25) + (revenue * 0.20)',\n  'Only include opportunities with final score >= 6.5.',\n  '',\n  'Return ONLY valid JSON array (no markdown fences):',\n  '[{',\n  '  \"title\": \"Product title optimized for search\",',\n  '  \"niche\": \"ebook_guide|ebook_bundle|spreadsheet_templates|notion_templates|business_documents\",',\n  '  \"description\": \"2-3 sentence product description for the listing\",',\n  '  \"score\": 8.5,',\n  '  \"score_demand\": 9,',\n  '  \"score_competition_gap\": 8,',\n  '  \"score_fit\": 9,',\n  '  \"score_revenue\": 8,',\n  '  \"rationale\": \"2-3 sentences with specific evidence\",',\n  '  \"competitive_strategy\": \"How Cipher Studio beats existing competitors\",',\n  '  \"bundle_opportunity\": \"What product types pair with this\",',\n  '  \"keywords\": [\"search terms buyers use\"],',\n  '  \"suggested_price\": 12.99,',\n  '  \"etsy_search\": \"what a buyer types into Etsy\",',\n  '  \"evidence\": \"specific data: competitor prices, review counts, trend direction\"',\n  '}]'\n];\n\nconst userContent = [\n  'CEO DIRECTIVES: ' + directiveText,\n  '',\n  'ETSY MARKETPLACE INTELLIGENCE (' + data.totalEtsy + ' opportunities from etsy.com web search):',\n  JSON.stringify(data.etsyOpportunities),\n  '',\n  'AMAZON KDP + GOOGLE TRENDS + REDDIT INTELLIGENCE (' + data.totalKDP + ' opportunities):',\n  JSON.stringify(data.kdpOpportunities),\n  '',\n  'Score all opportunities and return the top 5-8 as a JSON array.'\n].join('\\n');\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 8192,\n  system: systemLines.join('\\n'),\n  messages: [{ role: 'user', content: userContent }]\n});\n\nreturn [{ json: { requestBody } }];"
       }
     },
     {
@@ -466,7 +419,7 @@
         600
       ],
       "parameters": {
-        "jsCode": "const allSaved = $('Extract Saved Row').all();\nconst opportunities = allSaved\n  .map(item => item.json)\n  .filter(r => !r.skip && r.title !== '_no_results');\n\nconst highScorers = opportunities.filter(o => (o.score || 0) >= 7.5);\nconst dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n\nconst dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'Default research cycle (no CEO directives active)';\n\nconst topThree = opportunities.slice(0, 3);\nconst oppCards = topThree.map(o =>\n  '<div style=\"border:1px solid #222;border-radius:6px;padding:16px;margin-bottom:12px;\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 4px;\">' + (o.niche || '').toUpperCase().replace(/_/g, ' ') + '</p>'\n  + '<h3 style=\"margin:0 0 8px;font-size:14px;color:#fff;\">' + (o.title || '') + '</h3>'\n  + '<p style=\"color:#C8F53A;font-weight:bold;font-size:20px;margin:0 0 8px;\">' + (o.score || 0) + '/10</p>'\n  + '<p style=\"color:#aaa;font-size:13px;margin:0 0 8px;\">' + (o.rationale || '') + '</p>'\n  + '<p style=\"color:#666;font-size:12px;margin:0;\">Price: $' + (o.suggested_price || 0) + ' &middot; ' + (o.evidence || '') + '</p>'\n  + '</div>'\n).join('');\n\nconst html = '<div style=\"max-width:600px;margin:0 auto;font-family:Arial,sans-serif;background:#0A0A0A;color:#fff;\">'\n  + '<div style=\"padding:24px;text-align:center;\">'\n  + '<span style=\"color:#C8F53A;font-size:18px;letter-spacing:3px;font-weight:bold;\">CIPHER STUDIO</span>'\n  + '</div>'\n  + '<div style=\"padding:0 24px 24px;\">'\n  + '<h1 style=\"font-size:22px;margin:0 0 4px;\">Daily Research Report</h1>'\n  + '<p style=\"color:#666;margin:0 0 24px;font-size:13px;\">' + dateStr + '</p>'\n  + '<table style=\"width:100%;border-collapse:collapse;margin-bottom:20px;\"><tr>'\n  + '<td style=\"text-align:center;padding:16px;background:#111;border:1px solid #222;border-radius:6px;\">'\n  + '<p style=\"color:#C8F53A;font-size:28px;font-weight:bold;margin:0;\">' + opportunities.length + '</p>'\n  + '<p style=\"color:#888;font-size:11px;margin:4px 0 0;\">Opportunities</p></td>'\n  + '<td style=\"width:12px;\"></td>'\n  + '<td style=\"text-align:center;padding:16px;background:#111;border:1px solid #222;border-radius:6px;\">'\n  + '<p style=\"color:#C8F53A;font-size:28px;font-weight:bold;margin:0;\">' + highScorers.length + '</p>'\n  + '<p style=\"color:#888;font-size:11px;margin:4px 0 0;\">Auto-Triggered</p></td>'\n  + '</tr></table>'\n  + '<div style=\"background:#111;border:1px solid #333;border-radius:6px;padding:14px;margin-bottom:20px;\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 6px;\">CEO DIRECTIVES</p>'\n  + '<p style=\"color:#aaa;font-size:13px;margin:0;\">' + directiveText + '</p>'\n  + '</div>'\n  + '<h2 style=\"font-size:15px;margin:0 0 12px;\">Top Opportunities</h2>'\n  + (oppCards || '<p style=\"color:#666;font-size:14px;\">No high-scoring opportunities found today.</p>')\n  + '<p style=\"color:#444;font-size:11px;text-align:center;margin-top:20px;\">Review all in Supabase &rarr; opportunities table &middot; cipherstudio.co</p>'\n  + '</div>'\n  + '</div>';\n\nreturn [{ json: {\n  subject: 'Research Report: ' + opportunities.length + ' opportunities | ' + dateStr,\n  html\n} }];"
+        "jsCode": "const allSaved = $('Extract Saved Row').all();\nconst opportunities = allSaved\n  .map(item => item.json)\n  .filter(r => !r.skip && r.title !== '_no_results');\n\nconst highScorers = opportunities.filter(o => (o.score || 0) >= 7.5);\nconst dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n\nconst dirItems = $('Fetch CEO Directives').all();\nconst directiveText = (dirItems.length > 0 && dirItems[0].json && !dirItems[0].json.code)\n  ? dirItems.map(d => d.json.directive || '').filter(Boolean).join('. ')\n  : 'Default research cycle (no CEO directives active)';\n\nconst topThree = opportunities.slice(0, 3);\nconst oppCards = topThree.map(o =>\n  '<div style=\"border:1px solid #222;border-radius:6px;padding:16px;margin-bottom:12px;\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 4px;\">' + (o.niche || '').toUpperCase().replace(/_/g, ' ') + '</p>'\n  + '<h3 style=\"margin:0 0 8px;font-size:14px;color:#fff;\">' + (o.title || '') + '</h3>'\n  + '<p style=\"color:#C8F53A;font-weight:bold;font-size:20px;margin:0 0 8px;\">' + (o.score || 0) + '/10</p>'\n  + '<p style=\"color:#aaa;font-size:13px;margin:0 0 8px;\">' + (o.rationale || '') + '</p>'\n  + '<p style=\"color:#666;font-size:12px;margin:0;\">Price: $' + (o.suggested_price || 0) + ' · ' + (o.evidence || '') + '</p>'\n  + '</div>'\n).join('');\n\nconst html = '<div style=\"max-width:600px;margin:0 auto;font-family:Arial,sans-serif;background:#0A0A0A;color:#fff;\">'\n  + '<div style=\"padding:24px;text-align:center;\">'\n  + '<span style=\"color:#C8F53A;font-size:18px;letter-spacing:3px;font-weight:bold;\">CIPHER STUDIO</span>'\n  + '</div>'\n  + '<div style=\"padding:0 24px 24px;\">'\n  + '<h1 style=\"font-size:22px;margin:0 0 4px;\">Daily Research Report</h1>'\n  + '<p style=\"color:#666;margin:0 0 24px;font-size:13px;\">' + dateStr + '</p>'\n  + '<table style=\"width:100%;border-collapse:collapse;margin-bottom:20px;\"><tr>'\n  + '<td style=\"text-align:center;padding:16px;background:#111;border:1px solid #222;border-radius:6px;\">'\n  + '<p style=\"color:#C8F53A;font-size:28px;font-weight:bold;margin:0;\">' + opportunities.length + '</p>'\n  + '<p style=\"color:#888;font-size:11px;margin:4px 0 0;\">Opportunities</p></td>'\n  + '<td style=\"width:12px;\"></td>'\n  + '<td style=\"text-align:center;padding:16px;background:#111;border:1px solid #222;border-radius:6px;\">'\n  + '<p style=\"color:#C8F53A;font-size:28px;font-weight:bold;margin:0;\">' + highScorers.length + '</p>'\n  + '<p style=\"color:#888;font-size:11px;margin:4px 0 0;\">Auto-Triggered</p></td>'\n  + '</tr></table>'\n  + '<div style=\"background:#111;border:1px solid #333;border-radius:6px;padding:14px;margin-bottom:20px;\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 6px;\">CEO DIRECTIVES</p>'\n  + '<p style=\"color:#aaa;font-size:13px;margin:0;\">' + directiveText + '</p>'\n  + '</div>'\n  + '<h2 style=\"font-size:15px;margin:0 0 12px;\">Top Opportunities</h2>'\n  + (oppCards || '<p style=\"color:#666;font-size:14px;\">No high-scoring opportunities found today.</p>')\n  + '<p style=\"color:#444;font-size:11px;text-align:center;margin-top:20px;\">Review all in Supabase → opportunities table · cipherstudio.co</p>'\n  + '</div>'\n  + '</div>';\n\nreturn [{ json: {\n  subject: 'Research Report: ' + opportunities.length + ' opportunities | ' + dateStr,\n  html\n} }];"
       }
     },
     {
@@ -509,24 +462,30 @@
       "main": [
         [
           {
-            "node": "Etsy Template Search",
+            "node": "Build Etsy Web Search Request",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Etsy Ebook Search",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Build CI Request",
+            "node": "Build KDP/Trends Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Etsy Template Search": {
+    "Build Etsy Web Search Request": {
+      "main": [
+        [
+          {
+            "node": "Claude — Etsy Marketplace Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude — Etsy Marketplace Intelligence": {
       "main": [
         [
           {
@@ -537,35 +496,24 @@
         ]
       ]
     },
-    "Etsy Ebook Search": {
+    "Build KDP/Trends Request": {
+      "main": [
+        [
+          {
+            "node": "Claude — KDP/Trends/Reddit Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude — KDP/Trends/Reddit Intelligence": {
       "main": [
         [
           {
             "node": "Merge",
             "type": "main",
             "index": 1
-          }
-        ]
-      ]
-    },
-    "Build CI Request": {
-      "main": [
-        [
-          {
-            "node": "Claude — Competitive Intelligence",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Claude — Competitive Intelligence": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 2
           }
         ]
       ]
