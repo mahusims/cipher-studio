@@ -1,0 +1,499 @@
+{
+  "name": "Cipher Studio — Product Creation Agent v3",
+  "nodes": [
+    {
+      "id": "pca-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        340
+      ],
+      "webhookId": "cipher-product-creation",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "product-creation",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      }
+    },
+    {
+      "id": "pca-filter",
+      "name": "IF: Valid Opportunity",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        340
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "score-check",
+              "leftValue": "={{ $json.record?.score }}",
+              "rightValue": 7.5,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.record?.status }}",
+              "rightValue": "pending",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "event-check",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "INSERT",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "pca-build-request",
+      "name": "Build Claude Request Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        240
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const record = $('Webhook Trigger').item.json.record;\n\nconst systemLines = [\n  'You are the Product Creation Agent for Cipher Studio, a digital products business.',\n  '',\n  'BRAND:',\n  '- Name: Cipher Studio',\n  '- Colors: Cipher Lime (#C8F53A) on Void Black (#0A0A0A)',\n  '- Fonts: Bebas Neue (headers), Space Grotesk (body)',\n  '- Audience: Freelancers and small business owners',\n  '- Tone: Direct, professional, no fluff — tools that actually work',\n  '',\n  'Your job: generate a complete, build-ready product specification. The spec must be detailed enough that a builder can produce it directly — no guessing required.',\n  '',\n  'QUALITY STANDARDS:',\n  '- Spreadsheets: instructions tab, color-coded sections (Lime #C8F53A headers on Black #0A0A0A), working formulas specified precisely, dashboard/summary view',\n  '- Notion templates: logical database structure, filtered views, clear property labels, ready-to-use day one',\n  '- Document bundles: professional formatting, editable fields clearly marked with [BRACKETS], practical real-world language',\n  '- Ebooks (guide): 7-10 chapters for full guide, 4-5 for mini-guide. Each chapter has a clear outcome-focused title.',\n  '- Ebook bundles: ebook + 2-3 related templates. Bundle price 25-35% less than buying individually.',\n  '',\n  'CHOOSE THE RIGHT TYPE based on the niche field:',\n  '- spreadsheet: financial tracking, budgeting, invoicing, metrics (niche: spreadsheet_templates)',\n  '- notion: project management, client tracking, content planning (niche: notion_templates)',\n  '- document-bundle: contracts, proposals, onboarding packets (niche: business_documents)',\n  '- ebook_guide: standalone educational ebook — AI guides, how-to playbooks, tool tutorials (niche: ebook_guide)',\n  '- ebook_bundle: ebook paired with 2-3 related templates — spreadsheet + Notion + ebook (niche: ebook_bundle)',\n  '',\n  'Return ONLY valid JSON — no markdown fences, no prose outside the object.',\n  'Required top-level fields: title, type, description, suggested_price_usd, target_keywords, spec.',\n  '',\n  'SPEC STRUCTURES BY TYPE:',\n  'spreadsheet -> tabs (array of {name, purpose, columns, formulas, color_header, color_accent}), dashboard ({kpis, charts}), instructions_tab ({sections})',\n  'notion -> databases (array of {name, properties, views}), pages (array of {name, content})',\n  'document-bundle -> documents (array of {name, pages, sections, editable_fields})',\n  '',\n  'ebook_guide -> {',\n  '  \"chapters\": [{',\n  '    \"number\": 1,',\n  '    \"title\": \"outcome-focused chapter title\",',\n  '    \"description\": \"1-2 sentence overview of what this chapter covers\",',\n  '    \"sections\": [\"Section 1 title\", \"Section 2 title\"],',\n  '    \"page_type_hints\": [\"body\", \"body\", \"callout\", \"action\"],',\n  '    \"estimated_words\": 1500',\n  '  }],',\n  '  \"total_estimated_words\": 10000,',\n  '  \"total_estimated_pages\": 50,',\n  '  \"includes_checklists\": true,',\n  '  \"includes_data_tables\": true,',\n  '  \"price_strategy\": {',\n  '    \"etsy_price\": 12.99,',\n  '    \"payhip_price\": 14.99,',\n  '    \"kdp_price\": 9.99,',\n  '    \"bundle_price\": 29.99',\n  '  },',\n  '  \"bundle_candidates\": [\"titles of existing templates that pair well\"]',\n  '}',\n  '',\n  'ebook_bundle -> {',\n  '  \"ebook\": { same structure as ebook_guide spec above },',\n  '  \"bundled_templates\": [{',\n  '    \"name\": \"Template name\",',\n  '    \"type\": \"spreadsheet|notion|document\",',\n  '    \"description\": \"How this template complements the ebook\",',\n  '    \"existing_product_id\": \"if we already sell this, reference it — otherwise omit\"',\n  '  }],',\n  '  \"bundle_price_usd\": 29.99,',\n  '  \"individual_total_usd\": 42.97,',\n  '  \"savings_message\": \"Save $13 vs buying separately\"',\n  '}',\n  '',\n  'EBOOK QUALITY STANDARDS:',\n  '- 7-10 chapters for a full guide, 4-5 for a mini-guide',\n  '- Each chapter title must be outcome-focused (what the reader WILL be able to do)',\n  '- Include at least 2 action/checklist pages and 1 data/comparison page per ebook',\n  '- page_type_hints values: body | callout | action | data | feature',\n  '- Suggest specific cross-sell templates that complement the ebook topic in bundle_candidates',\n  '- Price ebooks at $9.99 on KDP (70% royalty tier), $12.99-14.99 on Etsy/Payhip',\n  '- For bundles, bundle_price_usd must be 25-35% less than individual_total_usd'\n];\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 4096,\n  system: systemLines.join('\\n'),\n  messages: [{\n    role: 'user',\n    content: 'Create a complete product specification for this market opportunity:\\n\\n' + JSON.stringify(record, null, 2)\n  }]\n});\n\nreturn [{ json: { requestBody } }];"
+      }
+    },
+    {
+      "id": "pca-claude",
+      "name": "Claude Sonnet — Generate Product Spec",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "=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"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "pca-parse",
+      "name": "Parse Product Spec",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        240
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = $json.content && $json.content[0] ? $json.content[0].text.trim() : '';\n\nconst clean = raw.startsWith('```')\n  ? raw.replace(/^```[a-z]*\\n?/, '').replace(/\\n?```$/, '').trim()\n  : raw;\n\nlet spec;\ntry {\n  spec = JSON.parse(clean);\n} catch (e) {\n  throw new Error('Claude returned invalid JSON. Raw: ' + raw.slice(0, 300));\n}\n\nif (!spec.title || !spec.type || !spec.description) {\n  throw new Error('Spec missing required fields. Got keys: ' + Object.keys(spec).join(', '));\n}\n\nconst opportunity = $('Webhook Trigger').item.json.record;\n\nreturn [{\n  json: {\n    title: spec.title,\n    type: spec.type,\n    description: spec.description,\n    suggested_price_usd: spec.suggested_price_usd || 0,\n    target_keywords: spec.target_keywords || [],\n    spec: spec.spec || {},\n    opportunity_id: opportunity.id,\n    opportunity_niche: opportunity.niche,\n    opportunity_etsy_search: opportunity.etsy_search\n  }\n}];"
+      }
+    },
+    {
+      "id": "pca-save-product",
+      "name": "Supabase — Save Product",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        140
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/products",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ opportunity_id: $json.opportunity_id, name: $json.title, type: $json.type, description: $json.description, suggested_price_usd: $json.suggested_price_usd, target_keywords: $json.target_keywords, spec: $json.spec, status: 'ready_for_creation' }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "pca-mark-opportunity",
+      "name": "Supabase — Mark Opportunity In Progress",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        340
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/opportunities?id=eq.{{ $('Parse Product Spec').item.json.opportunity_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'in_progress' }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "pca-build-file",
+      "name": "Build Product File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        40
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://primary-production-ef66d.up.railway.app/webhook/product-builder",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ product_id: Array.isArray($json) ? $json[0].id : $json.id }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          },
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "pca-build-email",
+      "name": "Build Notification Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        140
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const p = $('Parse Product Spec').item.json;\nconst fileUrl = $json.file_url || null;\nconst spec = p.spec || {};\n\nlet specRows = '';\nif (p.type === 'spreadsheet' && spec.tabs) {\n  specRows += '<h3 style=\"color:#C8F53A;margin:16px 0 8px;font-family:sans-serif\">Tabs (' + spec.tabs.length + ')</h3>';\n  specRows += '<ul style=\"margin:0;padding-left:20px;font-family:sans-serif\">';\n  spec.tabs.forEach(function(t) {\n    specRows += '<li><strong>' + t.name + '</strong> — ' + t.purpose + '</li>';\n  });\n  specRows += '</ul>';\n  if (spec.dashboard && spec.dashboard.kpis) {\n    specRows += '<h3 style=\"color:#C8F53A;margin:16px 0 8px;font-family:sans-serif\">Dashboard KPIs</h3>';\n    specRows += '<ul style=\"margin:0;padding-left:20px;font-family:sans-serif\">';\n    spec.dashboard.kpis.forEach(function(k) { specRows += '<li>' + k + '</li>'; });\n    specRows += '</ul>';\n  }\n} else if (p.type === 'notion' && spec.databases) {\n  specRows += '<h3 style=\"color:#C8F53A;margin:16px 0 8px;font-family:sans-serif\">Databases (' + spec.databases.length + ')</h3>';\n  specRows += '<ul style=\"margin:0;padding-left:20px;font-family:sans-serif\">';\n  spec.databases.forEach(function(d) {\n    const propCount = (d.properties || []).length;\n    const viewCount = (d.views || []).length;\n    specRows += '<li><strong>' + d.name + '</strong> — ' + propCount + ' properties, ' + viewCount + ' views</li>';\n  });\n  specRows += '</ul>';\n} else if (p.type === 'document-bundle' && spec.documents) {\n  specRows += '<h3 style=\"color:#C8F53A;margin:16px 0 8px;font-family:sans-serif\">Documents (' + spec.documents.length + ')</h3>';\n  specRows += '<ul style=\"margin:0;padding-left:20px;font-family:sans-serif\">';\n  spec.documents.forEach(function(d) {\n    specRows += '<li><strong>' + d.name + '</strong> — ' + (d.sections || []).length + ' sections</li>';\n  });\n  specRows += '</ul>';\n} else if (p.type === 'ebook_guide' && spec.chapters) {\n  specRows += '<h3 style=\"color:#C8F53A;margin:16px 0 8px;font-family:sans-serif\">Chapters (' + spec.chapters.length + ')</h3>';\n  if (spec.hook) {\n    specRows += '<p style=\"margin:0 0 12px;font-style:italic;color:#ccc;font-family:sans-serif\">' + spec.hook + '</p>';\n  }\n  specRows += '<ol style=\"margin:0;padding-left:20px;font-family:sans-serif\">';\n  spec.chapters.forEach(function(c) {\n    specRows += '<li style=\"margin-bottom:8px\"><strong>' + c.title + '</strong>'\n      + (c.estimated_words ? ' <span style=\"color:#888;font-size:12px\">(~' + c.estimated_words + ' words)</span>' : '')\n      + (c.description ? '<br><span style=\"color:#aaa;font-size:12px\">' + c.description + '</span>' : '')\n      + '</li>';\n  });\n  specRows += '</ol>';\n  if (spec.price_strategy) {\n    var ps = spec.price_strategy;\n    specRows += '<h3 style=\"color:#C8F53A;margin:16px 0 8px;font-family:sans-serif\">Pricing</h3>';\n    specRows += '<ul style=\"margin:0;padding-left:20px;font-family:sans-serif;color:#aaa\">';\n    if (ps.etsy_price)   specRows += '<li>Etsy / Payhip: $' + ps.etsy_price + '</li>';\n    if (ps.kdp_price)    specRows += '<li>Amazon KDP: $' + ps.kdp_price + '</li>';\n    if (ps.bundle_price) specRows += '<li>Bundle price: $' + ps.bundle_price + '</li>';\n    specRows += '</ul>';\n  }\n  if (spec.bundle_candidates && spec.bundle_candidates.length) {\n    specRows += '<p style=\"margin:12px 0 4px;font-family:sans-serif\"><strong style=\"color:#C8F53A\">Bundle candidates:</strong> ' + spec.bundle_candidates.join(', ') + '</p>';\n  }\n  specRows += '<p style=\"margin:16px 0 0;padding:10px 14px;background:#1C1C1C;border-left:3px solid #C8F53A;font-family:sans-serif;font-size:12px;letter-spacing:0.5px;color:#C8F53A\">Content Writer Agent has been triggered. You will receive follow-up emails as the manuscript is written and the PDF is designed.</p>';\n} else if (p.type === 'ebook_bundle' && (spec.ebook || spec.bundled_templates)) {\n  var ebookChaps = (spec.ebook && spec.ebook.chapters) ? spec.ebook.chapters : [];\n  specRows += '<h3 style=\"color:#C8F53A;margin:16px 0 8px;font-family:sans-serif\">Ebook (' + ebookChaps.length + ' chapters)</h3>';\n  if (spec.ebook && spec.ebook.hook) {\n    specRows += '<p style=\"margin:0 0 12px;font-style:italic;color:#ccc;font-family:sans-serif\">' + spec.ebook.hook + '</p>';\n  }\n  var bundledTpls = spec.bundled_templates || spec.templates || [];\n  if (bundledTpls.length) {\n    specRows += '<h3 style=\"color:#C8F53A;margin:16px 0 8px;font-family:sans-serif\">Bundled Templates (' + bundledTpls.length + ')</h3>';\n    specRows += '<ul style=\"margin:0;padding-left:20px;font-family:sans-serif\">';\n    bundledTpls.forEach(function(t) {\n      specRows += '<li><strong>' + t.name + '</strong> (' + t.type + ') — ' + t.description + '</li>';\n    });\n    specRows += '</ul>';\n  }\n  var bPrice = spec.bundle_price_usd || spec.bundle_price;\n  if (bPrice) {\n    specRows += '<p style=\"margin:12px 0 4px;font-family:sans-serif\"><strong style=\"color:#C8F53A\">Bundle price: $' + bPrice + '</strong>';\n    if (spec.individual_total_usd) specRows += ' <span style=\"color:#888;font-size:12px\">(vs $' + spec.individual_total_usd + ' individually)</span>';\n    if (spec.savings_message) specRows += '<br><span style=\"color:#aaa;font-size:12px\">' + spec.savings_message + '</span>';\n    specRows += '</p>';\n  }\n  specRows += '<p style=\"margin:16px 0 0;padding:10px 14px;background:#1C1C1C;border-left:3px solid #C8F53A;font-family:sans-serif;font-size:12px;letter-spacing:0.5px;color:#C8F53A\">Content Writer Agent has been triggered. You will receive follow-up emails as the manuscript is written and the PDF is designed.</p>';\n}\n\nconst keywords = (p.target_keywords || []).map(function(k) {\n  return '<span style=\"background:#C8F53A;color:#0A0A0A;padding:2px 8px;border-radius:4px;margin:2px;display:inline-block;font-size:12px;font-family:sans-serif\">' + k + '</span>';\n}).join(' ');\n\nconst dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\nconst typeLabel = (p.type || '').toUpperCase().replace(/-/g, ' ').replace(/_/g, ' ');\nconst price = typeof p.suggested_price_usd === 'number' ? p.suggested_price_usd.toFixed(2) : p.suggested_price_usd;\n\nconst html = '<!DOCTYPE html><html><body style=\"font-family:sans-serif;background:#0A0A0A;color:#fff;margin:0;padding:0\">'\n  + '<div style=\"max-width:640px;margin:0 auto;padding:32px 24px\">'\n  + '<p style=\"color:#C8F53A;font-size:12px;letter-spacing:2px;margin:0 0 8px\">CIPHER STUDIO</p>'\n  + '<h1 style=\"font-size:32px;color:#fff;margin:0 0 4px\">New Product Spec Ready</h1>'\n  + '<p style=\"color:#666;margin:0 0 32px;font-size:14px\">' + dateStr + '</p>'\n  + '<div style=\"background:#111;border:1px solid #222;border-radius:8px;padding:24px;margin-bottom:24px\">'\n  + '<p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 8px\">' + typeLabel + '</p>'\n  + '<h2 style=\"margin:0 0 12px;font-size:22px\">' + p.title + '</h2>'\n  + '<p style=\"color:#aaa;margin:0 0 16px;line-height:1.6\">' + p.description + '</p>'\n  + '<p style=\"margin:0\"><strong style=\"color:#C8F53A\">Suggested Price:</strong> $' + price + '</p>'\n  + '</div>'\n  + (specRows ? '<div style=\"background:#111;border:1px solid #222;border-radius:8px;padding:24px;margin-bottom:24px\">' + specRows + '</div>' : '')\n  + '<div style=\"background:#111;border:1px solid #222;border-radius:8px;padding:24px;margin-bottom:24px\">'\n  + '<h3 style=\"color:#C8F53A;margin:0 0 12px\">Target Keywords</h3>'\n  + '<div>' + keywords + '</div>'\n  + '</div>'\n  + (fileUrl ? '<div style=\"background:#111;border:1px solid #C8F53A;border-radius:8px;padding:20px;margin-bottom:24px;text-align:center\"><p style=\"color:#C8F53A;font-size:11px;letter-spacing:1px;margin:0 0 8px\">FILE READY</p><a href=\"' + fileUrl + '\" style=\"background:#C8F53A;color:#0A0A0A;padding:10px 24px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:14px\">Download .xlsx</a></div>' : '')\n  + '<p style=\"color:#444;font-size:12px;text-align:center\">Review the full spec in Supabase &rarr; products table &nbsp;&middot;&nbsp; cipherstudio.co</p>'\n  + '</div></body></html>';\n\nreturn [{ json: {\n  subject: 'New Product Spec: ' + p.title + ' (' + (p.type || '').replace(/_/g, ' ') + ')',\n  html: html\n} }];"
+      }
+    },
+    {
+      "id": "pca-gmail",
+      "name": "Gmail — Notify New Product Ready",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2220,
+        140
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "IUTmeSTPsDLh4Rqw",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "pca-type-router",
+      "name": "IF: Needs File Build",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "type-check",
+              "leftValue": "={{ $('Parse Product Spec').item.json.type }}",
+              "rightValue": "ebook",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "pca-trigger-writer",
+      "name": "Trigger Content Writer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://primary-production-ef66d.up.railway.app/webhook/content-writer",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ product_id: Array.isArray($json) ? $json[0].id : $json.id, spec: Array.isArray($json) ? ($json[0].spec || {}) : ($json.spec || {}) }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "IF: Valid Opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Valid Opportunity": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Request Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Request Body": {
+      "main": [
+        [
+          {
+            "node": "Claude Sonnet — Generate Product Spec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet — Generate Product Spec": {
+      "main": [
+        [
+          {
+            "node": "Parse Product Spec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Product Spec": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Save Product",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase — Mark Opportunity In Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Save Product": {
+      "main": [
+        [
+          {
+            "node": "IF: Needs File Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Product File": {
+      "main": [
+        [
+          {
+            "node": "Build Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Mark Opportunity In Progress": {
+      "main": []
+    },
+    "Build Notification Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Notify New Product Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Needs File Build": {
+      "main": [
+        [
+          {
+            "node": "Build Product File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trigger Content Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Content Writer": {
+      "main": [
+        [
+          {
+            "node": "Build Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "58ab8d46-04f9-4dd1-a257-5caed8ca877e",
+  "id": "cipher-product-creation-agent-v3",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "cipher-studio"
+    }
+  ]
+}
