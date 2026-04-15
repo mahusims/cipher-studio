@@ -1,0 +1,745 @@
+{
+  "name": "Cipher Studio — QA Agent",
+  "nodes": [
+    {
+      "id": "qa-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        400
+      ],
+      "webhookId": "cipher-ebook-qa",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ebook-qa",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-fetch-product",
+      "name": "Fetch Product",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/products",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ 'eq.' + $json.body.product_id }}"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-retry-check",
+      "name": "Check Retry Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const items = $('Fetch Product').all();\nconst product = items.length > 0 ? (Array.isArray(items[0].json) ? items[0].json[0] : items[0].json) : {};\nconst retryCount = product.qa_retry_count || 0;\nconst productId = $('Webhook Trigger').first().json.body.product_id;\n\nreturn [{ json: { product, retryCount, shouldEscalate: retryCount >= 2, productId } }];"
+      }
+    },
+    {
+      "id": "qa-if-retries",
+      "name": "IF: Max Retries",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        920,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "retry-check",
+              "leftValue": "={{ $json.shouldEscalate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "qa-build-escalate-email",
+      "name": "Build Escalation Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const { product, retryCount, productId } = $('Check Retry Count').first().json;\nconst title = product.name || 'Unknown Ebook';\n\nconst html = '<div style=\"max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333;\">'\n  + '<div style=\"background:#0A0A0A;padding:24px;text-align:center;\">'\n  + '<span style=\"color:#C8F53A;font-size:18px;letter-spacing:3px;font-weight:bold;\">CIPHER STUDIO</span>'\n  + '</div>'\n  + '<div style=\"padding:24px;\">'\n  + '<h2 style=\"margin:0 0 8px;color:#c00;\">Action Required: Manual QA Review</h2>'\n  + '<p style=\"margin:0 0 16px;color:#555;\">' + title + ' has failed QA ' + retryCount + ' times. Automatic retries exhausted.</p>'\n  + '<table style=\"width:100%;margin:0 0 20px;\">'\n  + '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Product</td><td style=\"padding:8px 0;font-size:14px;color:#333;\">' + title + '</td></tr>'\n  + '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Product ID</td><td style=\"padding:8px 0;font-size:14px;color:#333;font-family:monospace;font-size:12px;\">' + productId + '</td></tr>'\n  + '<tr><td style=\"padding:8px 0;font-size:14px;color:#888;\">Failed attempts</td><td style=\"padding:8px 0;font-size:14px;color:#c00;font-weight:bold;\">' + retryCount + '</td></tr>'\n  + '</table>'\n  + '<p style=\"background:#f5f5f0;border-left:3px solid #C8F53A;padding:12px 16px;font-size:13px;color:#555;margin:0;\">Please review the PDF in Supabase Storage and either fix manually, set status to qa_passed, or delete and regenerate.</p>'\n  + '</div>'\n  + '<div style=\"padding:16px 24px;border-top:1px solid #eee;text-align:center;\">'\n  + '<span style=\"font-size:11px;color:#aaa;\">Cipher Studio LLC &middot; Automated notification</span>'\n  + '</div>'\n  + '</div>';\n\nreturn [{ json: {\n  subject: 'ACTION REQUIRED: ' + title + ' failed QA ' + retryCount + ' times',\n  html\n} }];",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "qa-update-escalated",
+      "name": "Update Product — Escalate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        200
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/products?id=eq.{{ $('Check Retry Count').first().json.productId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'qa_failed_escalated' }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-gmail-escalate",
+      "name": "Gmail — Escalate",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1640,
+        200
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "IUTmeSTPsDLh4Rqw",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-fetch-html",
+      "name": "Fetch Ebook HTML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1160,
+        600
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.product.ebook_html_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "qa-build-request",
+      "name": "Build QA Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        600
+      ],
+      "parameters": {
+        "jsCode": "const product   = $('Check Retry Count').first().json.product;\nconst productId = $('Check Retry Count').first().json.productId;\nconst htmlItem  = $('Fetch Ebook HTML').first();\nconst ebookHtml = htmlItem.json.data || htmlItem.json.body || '';\n\nconst systemLines = [\n  'You are the QA Agent for Cipher Studio. Review ebooks before listing.',\n  '',\n  'Score these 4 criteria (1-10 each):',\n  '',\n  '1. CONTENT QUALITY: Practical, actionable, current facts, specific examples, substantial chapters, no filler.',\n  '2. FORMATTING: Chapter title pages + body pages + checklist per chapter, 30+ pages total, callouts/tables/stat cards used well, text not crammed.',\n  '3. BRAND CONSISTENCY: #C8F53A lime accents, #0A0A0A dark pages, Bebas Neue headings, Space Grotesk body, Cipher Studio in headers/footers/cover.',\n  '4. MARKET READINESS: Worth $10-15, competitive with top Etsy/Amazon ebooks, compelling TOC, professional feel.',\n  '',\n  'PASS requires ALL four scores >= 7.',\n  '',\n  'Return ONLY valid JSON (no markdown fences):',\n  '{',\n  '  \"pass\": true or false,',\n  '  \"overall_score\": average of 4 scores,',\n  '  \"content_score\": 0,',\n  '  \"formatting_score\": 0,',\n  '  \"brand_score\": 0,',\n  '  \"market_score\": 0,',\n  '  \"issues\": [\"specific issues if failing — be precise\"],',\n  '  \"revision_instructions\": \"Exact instructions for the Designer Agent — which pages, what to change.\",',\n  '  \"strengths\": [\"what works well\"],',\n  '  \"recommendation\": \"one sentence summary\"',\n  '}'\n];\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 4096,\n  system: systemLines.join('\\n'),\n  messages: [{\n    role: 'user',\n    content: 'Review this ebook for Cipher Studio:\\n\\nPRODUCT: ' + product.name + ' - ' + product.description + '\\n\\nEBOOK HTML (first 30000 chars):\\n' + ebookHtml.substring(0, 30000)\n  }]\n});\n\nreturn [{ json: { requestBody, productId, product } }];"
+      }
+    },
+    {
+      "id": "qa-claude",
+      "name": "Claude Sonnet — QA Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "=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"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "qa-parse-result",
+      "name": "Parse QA Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1880,
+        600
+      ],
+      "parameters": {
+        "jsCode": "const raw = $json.content && $json.content[0] ? $json.content[0].text.trim() : '';\nlet clean = raw;\nconst firstBrace = clean.indexOf('{');\nconst lastBrace  = clean.lastIndexOf('}');\nif (firstBrace !== -1 && lastBrace !== -1) {\n  clean = clean.substring(firstBrace, lastBrace + 1);\n}\nlet result;\ntry {\n  result = JSON.parse(clean);\n} catch (e) {\n  result = {\n    pass: false, overall_score: 0,\n    issues: ['QA JSON parse error: ' + e.message],\n    revision_instructions: 'Regenerate the ebook — QA could not parse the result.',\n    strengths: [], recommendation: 'Parse failed'\n  };\n}\n\nconst prev = $('Build QA Request').first().json;\nreturn [{ json: { ...result, productId: prev.productId, product: prev.product } }];",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "qa-if-passed",
+      "name": "IF: QA Passed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2120,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "pass-check",
+              "leftValue": "={{ $json.pass }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "qa-update-passed",
+      "name": "Update Product — QA Passed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2360,
+        400
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/products?id=eq.{{ $json.productId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'qa_passed', qa_retry_count: 0 }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-trigger-listing",
+      "name": "Trigger Listing Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://primary-production-ef66d.up.railway.app/webhook/listing-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ product_id: $('Parse QA Result').first().json.productId }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "qa-build-passed-email",
+      "name": "Build QA Passed Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2840,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const qa = $('Parse QA Result').first().json;\nconst { product, productId, overall_score, content_score, formatting_score, brand_score, market_score, strengths, recommendation } = qa;\nconst title = product.name || 'Unknown Ebook';\n\nconst scoreRow = (label, score) =>\n  '<tr><td style=\"padding:6px 0;font-size:14px;color:#888;\">' + label + '</td>'\n  + '<td style=\"padding:6px 0;font-size:14px;font-weight:bold;color:#333;\">' + (score || 0) + '/10</td></tr>';\n\nconst html = '<div style=\"max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333;\">'\n  + '<div style=\"background:#0A0A0A;padding:24px;text-align:center;\">'\n  + '<span style=\"color:#C8F53A;font-size:18px;letter-spacing:3px;font-weight:bold;\">CIPHER STUDIO</span>'\n  + '</div>'\n  + '<div style=\"padding:24px;\">'\n  + '<h2 style=\"margin:0 0 4px;color:#0A0A0A;\">QA Passed</h2>'\n  + '<h3 style=\"margin:0 0 16px;font-size:16px;color:#333;font-weight:normal;\">' + title + '</h3>'\n  + '<p style=\"margin:0 0 20px;font-size:16px;font-weight:bold;color:#C8F53A;background:#0A0A0A;padding:12px 16px;border-radius:4px;\">Overall Score: ' + (overall_score || 0) + '/10</p>'\n  + '<table style=\"width:100%;margin:0 0 20px;\">'\n  + scoreRow('Content Quality', content_score)\n  + scoreRow('Formatting', formatting_score)\n  + scoreRow('Brand Consistency', brand_score)\n  + scoreRow('Market Readiness', market_score)\n  + '</table>'\n  + (strengths && strengths.length ? '<h4 style=\"margin:0 0 8px;\">Strengths</h4><ul style=\"margin:0 0 16px;padding-left:20px;\">'\n    + strengths.map(function(s) { return '<li style=\"font-size:14px;color:#555;margin-bottom:4px;\">' + s + '</li>'; }).join('')\n    + '</ul>' : '')\n  + '<p style=\"margin:0 0 16px;font-size:14px;color:#666;font-style:italic;\">' + (recommendation || '') + '</p>'\n  + '<p style=\"background:#f5f5f0;border-left:3px solid #C8F53A;padding:12px 16px;font-size:13px;color:#555;margin:0;\">Listing Agent has been triggered to prepare this product for sale.</p>'\n  + '</div>'\n  + '<div style=\"padding:16px 24px;border-top:1px solid #eee;text-align:center;\">'\n  + '<span style=\"font-size:11px;color:#aaa;\">Cipher Studio LLC &middot; Automated notification</span>'\n  + '</div>'\n  + '</div>';\n\nreturn [{ json: {\n  subject: 'QA PASSED: ' + title + ' (score: ' + (overall_score || 0) + '/10)',\n  html\n} }];",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "qa-gmail-passed",
+      "name": "Gmail — QA Passed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3080,
+        400
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "IUTmeSTPsDLh4Rqw",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-increment-retry",
+      "name": "Increment Retry Count",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2360,
+        800
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://illcsxpidmluhdwgygwf.supabase.co/rest/v1/products?id=eq.{{ $json.productId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_ZoIwHQvMJYS_l5HWcL64sQ_rWLUTTjS"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'qa_revision_needed', qa_retry_count: $json.product.qa_retry_count ? $json.product.qa_retry_count + 1 : 1 }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-trigger-designer",
+      "name": "Trigger Designer with Revisions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        800
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://primary-production-ef66d.up.railway.app/webhook/ebook-design",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ product_id: $('Parse QA Result').first().json.productId, manuscript_markdown: 'REVISION REQUEST', revision_notes: $('Parse QA Result').first().json.revision_instructions || '' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "qa-build-revision-email",
+      "name": "Build QA Revision Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2840,
+        800
+      ],
+      "parameters": {
+        "jsCode": "const qa = $('Parse QA Result').first().json;\nconst { product, productId, overall_score, content_score, formatting_score, brand_score, market_score, issues, revision_instructions, recommendation } = qa;\nconst title = product.name || 'Unknown Ebook';\nconst retryNum = (product.qa_retry_count || 0) + 1;\n\nconst scoreRow = (label, score) =>\n  '<tr><td style=\"padding:6px 0;font-size:14px;color:#888;\">' + label + '</td>'\n  + '<td style=\"padding:6px 0;font-size:14px;font-weight:bold;color:' + (score >= 7 ? '#333' : '#c00') + ';\">' + (score || 0) + '/10' + (score < 7 ? ' ✗' : '') + '</td></tr>';\n\nconst html = '<div style=\"max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333;\">'\n  + '<div style=\"background:#0A0A0A;padding:24px;text-align:center;\">'\n  + '<span style=\"color:#C8F53A;font-size:18px;letter-spacing:3px;font-weight:bold;\">CIPHER STUDIO</span>'\n  + '</div>'\n  + '<div style=\"padding:24px;\">'\n  + '<h2 style=\"margin:0 0 4px;color:#c00;\">QA Revision #' + retryNum + '</h2>'\n  + '<h3 style=\"margin:0 0 16px;font-size:16px;color:#333;font-weight:normal;\">' + title + '</h3>'\n  + '<p style=\"margin:0 0 20px;font-size:16px;font-weight:bold;color:#fff;background:#c00;padding:12px 16px;border-radius:4px;\">Overall Score: ' + (overall_score || 0) + '/10 — FAILED</p>'\n  + '<table style=\"width:100%;margin:0 0 20px;\">'\n  + scoreRow('Content Quality', content_score)\n  + scoreRow('Formatting', formatting_score)\n  + scoreRow('Brand Consistency', brand_score)\n  + scoreRow('Market Readiness', market_score)\n  + '</table>'\n  + (issues && issues.length ? '<h4 style=\"margin:0 0 8px;color:#c00;\">Issues Found</h4><ul style=\"margin:0 0 16px;padding-left:20px;\">'\n    + issues.map(function(i) { return '<li style=\"font-size:14px;color:#555;margin-bottom:4px;\">' + i + '</li>'; }).join('')\n    + '</ul>' : '')\n  + '<h4 style=\"margin:0 0 8px;\">Revision Instructions Sent to Designer</h4>'\n  + '<p style=\"margin:0 0 16px;font-size:14px;color:#333;background:#f9f9f9;padding:12px;border-radius:4px;\">' + (revision_instructions || '') + '</p>'\n  + '<p style=\"background:#f5f5f0;border-left:3px solid #C8F53A;padding:12px 16px;font-size:13px;color:#555;margin:0;\">Designer Agent has been automatically re-triggered with these revision notes. You will receive another email when the revised ebook is ready for QA.</p>'\n  + '</div>'\n  + '<div style=\"padding:16px 24px;border-top:1px solid #eee;text-align:center;\">'\n  + '<span style=\"font-size:11px;color:#aaa;\">Cipher Studio LLC &middot; Automated notification</span>'\n  + '</div>'\n  + '</div>';\n\nreturn [{ json: {\n  subject: 'QA REVISION #' + retryNum + ': ' + title + ' (score: ' + (overall_score || 0) + '/10)',\n  html\n} }];",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "qa-gmail-revision",
+      "name": "Gmail — QA Revision",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3080,
+        800
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "IUTmeSTPsDLh4Rqw",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "hello@cipherstudio.co",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Product": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Count": {
+      "main": [
+        [
+          {
+            "node": "IF: Max Retries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Max Retries": {
+      "main": [
+        [
+          {
+            "node": "Build Escalation Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Ebook HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Escalation Email": {
+      "main": [
+        [
+          {
+            "node": "Update Product — Escalate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Product — Escalate": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Escalate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Ebook HTML": {
+      "main": [
+        [
+          {
+            "node": "Build QA Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build QA Request": {
+      "main": [
+        [
+          {
+            "node": "Claude Sonnet — QA Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet — QA Review": {
+      "main": [
+        [
+          {
+            "node": "Parse QA Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse QA Result": {
+      "main": [
+        [
+          {
+            "node": "IF: QA Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: QA Passed": {
+      "main": [
+        [
+          {
+            "node": "Update Product — QA Passed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Increment Retry Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Product — QA Passed": {
+      "main": [
+        [
+          {
+            "node": "Trigger Listing Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Listing Agent": {
+      "main": [
+        [
+          {
+            "node": "Build QA Passed Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build QA Passed Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail — QA Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Retry Count": {
+      "main": [
+        [
+          {
+            "node": "Trigger Designer with Revisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Designer with Revisions": {
+      "main": [
+        [
+          {
+            "node": "Build QA Revision Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build QA Revision Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail — QA Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "versionId": "276bdbd8-d871-4690-b5ce-2ae80935f3f9",
+  "id": "cipher-qa-agent-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "cipher-studio"
+    }
+  ]
+}
